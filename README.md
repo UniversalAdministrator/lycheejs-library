@@ -9,12 +9,10 @@ Support our libre Bot Cloud via BTC [1CamMuvrFU1QAMebPoDsL3JrioVDoxezY2](bitcoin
 
 ## Overview
 
-This is the lycheeJS Library that can be used in your existing projects.
-
+This is the lycheeJS Library that can be used standalone in your existing projects.
 The upstream project [lycheeJS](https://github.com/Artificial-Engineering/lycheeJS.git)
-is an `Isomorphic Engine`, this project is the `Isomorphic Library`
-which lacks essential features such as the `lycheejs-*` tools and
-the Fertilizers.
+is an `Isomorphic Engine`, this project is the `Isomorphic Library` which
+lacks essential features such as the `lycheejs-*` tools and the Fertilizers.
 
 
 
@@ -59,7 +57,7 @@ This method guarantees isomorphic behaviour across all platforms.
 ```
 
 ```javascript
-var lychee   = require('lycheejs')(__dirname);
+var lychee   = (window || global).lychee;
 var Renderer = lychee.import('lychee.Renderer');
 
 var renderer = new Renderer({
