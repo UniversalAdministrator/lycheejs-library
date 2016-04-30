@@ -1,0 +1,18 @@
+{
+	"name":        "lycheejs",
+	"main":        "build/html/lychee.js",
+	"homepage":    "https://lychee.js.org",
+	"description": "Next-Gen Isomorphic Application Engine"
+	"license":     "MIT",
+	"repository":  {
+		"type": "git",
+		"url":  "https://github.com/Artificial-Engineering/lycheeJS-library.git"
+	},
+	"moduleType":  [
+		"globals"
+	],
+	"ignore":      [
+		"**/.*",
+		"package.json"
+	]
+}
