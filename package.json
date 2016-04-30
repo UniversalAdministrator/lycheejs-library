@@ -4,7 +4,7 @@
 	"version":     "2016.1.0",
 	"main":        "build/node/lychee.js",
 	"homepage":    "https://lychee.js.org",
-	"description": "Next-Gen Isomorphic Application Engine"
+	"description": "Next-Gen Isomorphic Application Engine",
 	"license":     "MIT",
 	"repository":  {
 		"type": "git",
