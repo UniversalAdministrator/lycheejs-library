@@ -57,7 +57,7 @@ Use the lycheeJS Definitions with the `lychee.import(identifier)` method.
 This method guarantees isomorphic behaviour across all platforms.
 
 ```html
-<script src="./bower_components/lycheejs/dist/html/lychee.js"></script>
+<script src="./bower_components/lycheejs/build/html/lychee.js"></script>
 ```
 
 ```javascript
