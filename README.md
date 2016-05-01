@@ -29,12 +29,16 @@ Use the lycheeJS Definitions with the `lychee.import(identifier)` method.
 This method guarantees isomorphic behaviour across all platforms.
 
 ```javascript
-var lychee   = require('lycheejs')(__dirname);
-var Renderer = lychee.import('lychee.Renderer');
+var lychee = require('lycheejs')(__dirname);
 
-var renderer = new Renderer({
-	width: 1024,
-	height: 768
+lychee.environment.init(function(sandbox) {
+
+	var Renderer = lychee.import('lychee.Renderer');
+	var renderer = new Renderer({
+		width: 1024,
+		height: 768
+	}); 
+
 });
 ```
  
@@ -57,12 +61,16 @@ This method guarantees isomorphic behaviour across all platforms.
 ```
 
 ```javascript
-var lychee   = (window || global).lychee;
-var Renderer = lychee.import('lychee.Renderer');
+var lychee = (window || global).lychee;
 
-var renderer = new Renderer({
-	width: 1024,
-	height: 768
+lychee.environment.init(function(sandbox) {
+
+	var Renderer = lychee.import('lychee.Renderer');
+	var renderer = new Renderer({
+		width: 1024,
+		height: 768
+	});
+
 });
 ```
 

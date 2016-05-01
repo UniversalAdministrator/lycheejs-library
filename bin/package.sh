@@ -19,7 +19,10 @@ _build() {
 	fi;
 
 	cat $core $dist > $target;
-	echo -e "\nlychee.inject(lychee.ENVIRONMENTS[\"/libraries/lychee/dist\"]);\n" >> $target;
+	echo -e "\n" >> $target;
+	echo -e "lychee.inject(lychee.ENVIRONMENTS[\"/libraries/lychee/dist\"]);\n" >> $target;
+	echo -e "lychee.environment.type  = \"build\";\n"                           >> $target;
+	echo -e "lychee.environment.build = \"lychee.DIST\";\n"                     >> $target;
 
 }
 
