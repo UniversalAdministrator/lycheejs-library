@@ -1,42 +1,80 @@
 #!/bin/bash
 
-echo "SUCCESS";
-exit 0;
 
-LYCHEEJS_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../../../"; pwd);
-PROJECT_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../"; pwd);
-LYCHEEJS_HELPER=`which lycheejs-helper`;
+_get_version () {
 
-CURRENT_YEAR=`date +%Y`;  # 2016
-CURRENT_MONTH=`date +%m`; # 05
-RELEASE_VERSION="";
+	local old_ver=$(cd $PROJECT_ROOT && cat bower.json | grep version | cut -d\" -f4);
+	local new_ver="${LYCHEEJS_VERSION/-Q/.}.0";
+	local cur_ver=`echo -e "$old_ver\n$new_ver" | sort -V | tail -n1`;
 
-if [ $CURRENT_MONTH -gt "09" ]; then
-	RELEASE_VERSION="$CURRENT_YEAR-Q4";
-elif [ $CURRENT_MONTH -gt "06" ]; then
-	RELEASE_VERSION="$CURRENT_YEAR-Q3";
-elif [ $CURRENT_MONTH -gt "03" ]; then
-	RELEASE_VERSION="$CURRENT_YEAR-Q2";
-else
-	RELEASE_VERSION="$CURRENT_YEAR-Q1";
+	echo $cur_ver;
+
+}
+
+NPM_BIN=`which npm`;
+LYCHEEJS_ROOT=$(cd "$(dirname "$0")/../../../"; pwd);
+LYCHEEJS_VERSION=$(cd $LYCHEEJS_ROOT && cat ./libraries/lychee/source/core/lychee.js | grep VERSION | cut -d\" -f2);
+PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
+LYCHEEJS_HELPER="$LYCHEEJS_ROOT/bin/helper.sh";
+
+
+if [ ! -x "$LYCHEEJS_HELPER" ]; then
+	LYCHEEJS_HELPER=`which lycheejs-helper`;
 fi;
 
 
-if [ "$LYCHEEJS_HELPER" == "" ]; then
-	LYCHEEJS_HELPER="$LYCHEEJS_ROOT/bin/helper.sh";
+if [ "$NPM_BIN" == "" ]; then
+	echo "Install NPM first.";
+	exit 1;
 fi;
 
 
-if [ -e "$LYCHEEJS_HELPER" ]; then
+if [ -x "$LYCHEEJS_HELPER" ]; then
 
 	cd $PROJECT_ROOT;
-	tag=`git tag`;
+	old_version=`git tag | tail -n1`;
+	new_version="$(_get_version)";
 
-	"$LYCHEEJS_HELPER" env:node ./bin/package-bower.js $tag;
-	"$LYCHEEJS_HELPER" env:node ./bin/package-npm.js $tag;
+	if [ "$old_version" != "$new_version" ]; then
 
-# TODO: git push origin --tags
-# TODO: bower publish, npm publish
+		cd $PROJECT_ROOT;
+
+		sed -i "s|$old_version|$new_version|g" ./bower.json;
+		sed -i "s|$old_version|$new_version|g" ./package.json;
+
+		git add ./build;
+		git add ./bower.json;
+		git add ./package.json;
+
+		git_diff=`git diff`;
+
+		if [ `git diff` != "" ]; then
+
+			git commit -m "lychee.js Library $LYCHEEJS_VERSION release";
+			git push origin master;
+
+			git tag $new_version;
+			git push origin --tags;
+
+			$NPM_BIN publish;
+
+			echo "lychee.js Library Release for $new_version done.";
+			exit 0;
+
+		else
+
+			echo "lychee.js Library Release for $new_version already done.";
+			exit 0;
+
+		fi;
+
+
+	else
+
+		echo "lychee.js Library Release for $new_version already done.";
+		exit 0;
+
+	fi;
 
 fi;
 

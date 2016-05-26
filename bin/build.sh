@@ -1,12 +1,12 @@
 #!/bin/bash
 
 
-LYCHEEJS_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../../../"; pwd);
-PROJECT_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../"; pwd);
-LYCHEEJS_FERTILIZER=`which lycheejs-fertilizer`;
+LYCHEEJS_ROOT=$(cd "$(dirname "$0")/../../../"; pwd);
+PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
+LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/bin/fertilizer.sh";
 
-if [ "$LYCHEEJS_FERTILIZER" == "" ]; then
-	LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/bin/fertilizer.sh";
+if [ ! -x "$LYCHEEJS_FERTILIZER" ]; then
+	LYCHEEJS_FERTILIZER=`which lycheejs-fertilizer`;
 fi;
 
 
@@ -33,7 +33,7 @@ _concat() {
 
 
 
-if [ -e "$LYCHEEJS_FERTILIZER" ]; then
+if [ -x "$LYCHEEJS_FERTILIZER" ]; then
 
 	cd $LYCHEEJS_ROOT;
 
