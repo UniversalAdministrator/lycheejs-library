@@ -45,25 +45,18 @@ if [ -e "$LYCHEEJS_FERTILIZER" ]; then
 
 
 	if [ -d $PROJECT_ROOT/build ]; then
-
 		cd $PROJECT_ROOT;
 		rm -rf ./build;
-
-		_concat html;
-		_concat html-nwjs;
-		_concat html-webview;
-		_concat node;
-		# _concat node-sdl;
-
-		echo "SUCCESS";
-		exit 0;
-
-	else
-
-		echo "FAILURE";
-		exit 1;
-
 	fi;
+
+	_concat html;
+	_concat html-nwjs;
+	_concat html-webview;
+	_concat node;
+	# _concat node-sdl;
+
+	echo "SUCCESS";
+	exit 0;
 
 else
 
