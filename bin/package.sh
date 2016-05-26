@@ -1,48 +1,42 @@
 #!/bin/bash
 
+echo "SUCCESS";
+exit 0;
 
-LYCHEEJS_ROOT="/opt/lycheejs";
+LYCHEEJS_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../../../"; pwd);
 PROJECT_ROOT=$(cd "$(dirname "$(readlink -f "$0")")/../"; pwd);
+LYCHEEJS_HELPER=`which lycheejs-helper`;
+
+CURRENT_YEAR=`date +%Y`;  # 2016
+CURRENT_MONTH=`date +%m`; # 05
+RELEASE_VERSION="";
+
+if [ $CURRENT_MONTH -gt "09" ]; then
+	RELEASE_VERSION="$CURRENT_YEAR-Q4";
+elif [ $CURRENT_MONTH -gt "06" ]; then
+	RELEASE_VERSION="$CURRENT_YEAR-Q3";
+elif [ $CURRENT_MONTH -gt "03" ]; then
+	RELEASE_VERSION="$CURRENT_YEAR-Q2";
+else
+	RELEASE_VERSION="$CURRENT_YEAR-Q1";
+fi;
 
 
-_build() {
-
-	platform="$1";
-	target="$PROJECT_ROOT/build/$platform/lychee.js";
-	folder=$(dirname "$target");
-	core="$LYCHEEJS_ROOT/libraries/lychee/build/$platform/core.js";
-	dist="$LYCHEEJS_ROOT/libraries/lychee/build/$platform/dist/index.js";
+if [ "$LYCHEEJS_HELPER" == "" ]; then
+	LYCHEEJS_HELPER="$LYCHEEJS_ROOT/bin/helper.sh";
+fi;
 
 
-	if [ ! -d "$folder" ]; then
-		mkdir -p "$folder";
-	fi;
+if [ -e "$LYCHEEJS_HELPER" ]; then
 
-	cat $core $dist > $target;
-	echo -e "\n" >> $target;
-	echo -e "lychee.inject(lychee.ENVIRONMENTS[\"/libraries/lychee/dist\"]);\n" >> $target;
-	echo -e "lychee.environment.type  = \"build\";\n"                           >> $target;
-	echo -e "lychee.environment.build = \"lychee.DIST\";\n"                     >> $target;
+	cd $PROJECT_ROOT;
+	tag=`git tag`;
 
-}
+	"$LYCHEEJS_HELPER" env:node ./bin/package-bower.js $tag;
+	"$LYCHEEJS_HELPER" env:node ./bin/package-npm.js $tag;
 
+# TODO: git push origin --tags
+# TODO: bower publish, npm publish
 
-cd $LYCHEEJS_ROOT;
-
-./bin/fertilizer.sh html/dist /libraries/lychee;
-./bin/fertilizer.sh html-nwjs/dist /libraries/lychee;
-./bin/fertilizer.sh html-webview/dist /libraries/lychee;
-./bin/fertilizer.sh node/dist /libraries/lychee;
-# ./bin/fertilizer.sh node-sdl/dist /libraries/lychee;
-
-
-cd $PROJECT_ROOT;
-rm -rf ./build;
-
-
-_build html;
-_build html-nwjs;
-_build html-webview;
-_build node;
-# _build node-sdl;
+fi;
 
