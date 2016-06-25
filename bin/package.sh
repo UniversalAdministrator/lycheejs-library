@@ -39,12 +39,14 @@ if [ -x "$LYCHEEJS_HELPER" ]; then
 
 		cd $PROJECT_ROOT;
 
-		sed -i "s|$old_version|$new_version|g" ./bower.json;
-		sed -i "s|$old_version|$new_version|g" ./package.json;
+		sed -i "s|$old_version|$new_version|g"                   ./bower.json;
+		sed -i "s|$old_version|$new_version|g"                   ./package.json;
+		sed -i 's|2[0-9][0-9][0-9]-Q[1-4]|'$LYCHEEJS_VERSION'|g' ./README.md;
 
 		git add ./build;
 		git add ./bower.json;
 		git add ./package.json;
+		git add ./README.md;
 
 		git_diff=`git diff`;
 
