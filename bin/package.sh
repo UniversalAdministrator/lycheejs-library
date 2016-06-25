@@ -24,7 +24,7 @@ fi;
 
 
 if [ "$NPM_BIN" == "" ]; then
-	echo "Install NPM first.";
+	echo "FAILURE: Install NPM first.";
 	exit 1;
 fi;
 
@@ -50,31 +50,21 @@ if [ -x "$LYCHEEJS_HELPER" ]; then
 
 		if [ `git diff` != "" ]; then
 
-			git commit -m "lychee.js Library $LYCHEEJS_VERSION release";
-			git push origin master;
-
+			git commit -m ":construction: lychee.js Library $LYCHEEJS_VERSION CI build :construction:";
 			git tag $new_version;
-			git push origin --tags;
-
-			$NPM_BIN publish;
-
-			echo "lychee.js Library Release for $new_version done.";
-			exit 0;
-
-		else
-
-			echo "lychee.js Library Release for $new_version already done.";
-			exit 0;
 
 		fi;
 
-
-	else
-
-		echo "lychee.js Library Release for $new_version already done.";
-		exit 0;
-
 	fi;
+
+
+	echo "SUCCESS";
+	exit 0;
+
+else
+
+	echo "FAILURE";
+	exit 1;
 
 fi;
 
