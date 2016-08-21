@@ -13,7 +13,11 @@ This is the lychee.js Isomorphic Library that can be used standalone in your exi
 
 The upstream project [lychee.js](https://github.com/Artificial-Engineering/lycheeJS.git)
 is the `Isomorphic Engine`, this project is the `Isomorphic Library` which lacks
-essential features such as the `lycheejs-*` tools and all software bots.
+essential features such as the `lycheejs-*` tools, integration with our Software
+Bots and the Artificial Intelligence.
+
+This downstream project can be seen as a quick prototyping library for several
+platforms - quick n' dirty style.
 
 
 
@@ -30,12 +34,12 @@ Use the lychee.js Definitions with the `lychee.import(identifier)` method.
 This method guarantees isomorphic behaviour across all platforms.
 
 ```javascript
-var lychee = require('lycheejs')(__dirname);
+const lychee = require('lycheejs')(__dirname);
 
 lychee.environment.init(function(sandbox) {
 
-	var Renderer = lychee.import('lychee.Renderer');
-	var renderer = new Renderer({
+	let Renderer = lychee.import('lychee.Renderer');
+	let renderer = new Renderer({
 		width: 1024,
 		height: 768
 	}); 
@@ -62,12 +66,12 @@ This method guarantees isomorphic behaviour across all platforms.
 ```
 
 ```javascript
-var lychee = (window || global).lychee;
+let lychee = (window || global).lychee;
 
 lychee.environment.init(function(sandbox) {
 
-	var Renderer = lychee.import('lychee.Renderer');
-	var renderer = new Renderer({
+	let Renderer = lychee.import('lychee.Renderer');
+	let renderer = new Renderer({
 		width: 1024,
 		height: 768
 	});
@@ -79,9 +83,20 @@ lychee.environment.init(function(sandbox) {
 
 ## License
 
-lychee.js is (c) 2012-2016 Artificial-Engineering and released under MIT / Expat license.
-The projects and demos are licensed under CC0 (public domain) license.
-The runtimes are owned and copyrighted by their respective owners and may be shipped under a different license.
+The lychee.js Engine (defined as [lycheejs](https://github.com/Artificial-Engineering/lycheejs.git)
+repository) is (c) 2012-2016 Artificial-Engineering and released under
+[MIT / Expat](./LICENSE_MIT.txt) license.
 
-For further details take a look at the [LICENSE.txt](LICENSE.txt) file.
+The generated code by our Artificial Intelligence (namely the GitHub Account
+[@humansneednotapply](https://github.com/humansneednotapply) or the commit's
+e-mail address `robot [ insert an at here] artificial.engineering`) is released
+under [GNU GPL 3](./LICENSE_GPL3.txt) license.
+
+The date of each commit is equivalent to the date (Central European Timezone)
+of claimed copyright and license, no matter from which timezone or physical
+location they were commited from.
+
+The generated code by the Artificial Intelligence overrules the MIT / Expat
+license in every case, with no exceptions. The code is distributed in a libre
+way to guarantee free and open knowledge distribution for our Software Bots.
 

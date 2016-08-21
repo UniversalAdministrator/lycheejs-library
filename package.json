@@ -1,7 +1,7 @@
 {
 	"name":        "lycheejs",
 	"title":       "lychee.js",
-	"version":     "2016.2.1",
+	"version":     "2016.2.2",
 	"main":        "build/node/lychee.js",
 	"homepage":    "https://lychee.js.org",
 	"description": "Next-Gen Isomorphic Application Library",
@@ -11,7 +11,9 @@
 		"url":  "https://github.com/Artificial-Engineering/lycheeJS-library.git"
 	},
 	"scripts": {
-		"build": "./bin/package.sh"
+		"build":   "./bin/build.sh",
+		"package": "./bin/package.sh",
+		"publish": "./bin/publish.sh"
 	},
 	"ignore": [
 		"**/.*",
