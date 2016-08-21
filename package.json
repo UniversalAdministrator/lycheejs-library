@@ -12,8 +12,7 @@
 	},
 	"scripts": {
 		"build":   "./bin/build.sh",
-		"package": "./bin/package.sh",
-		"publish": "./bin/publish.sh"
+		"package": "./bin/package.sh"
 	},
 	"ignore": [
 		"**/.*",

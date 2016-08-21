@@ -1,7 +1,7 @@
 {
 	"name":        "lycheejs",
 	"main":        "build/html/lychee.js",
-	"version":     "2016.2.0",
+	"version":     "2016.2.2",
 	"homepage":    "https://lychee.js.org",
 	"description": "Next-Gen Isomorphic Application Library",
 	"license":     "MIT",
