@@ -4,7 +4,10 @@
 	"version":     "2016.2.2",
 	"homepage":    "https://lychee.js.org",
 	"description": "Next-Gen Isomorphic Application Library",
-	"license":     "MIT",
+	"license":     [
+		"MIT",
+		"GPL-3.0"
+	],
 	"repository":  {
 		"type": "git",
 		"url":  "https://github.com/Artificial-Engineering/lycheeJS-library.git"
