@@ -50,7 +50,7 @@ if [ -x "$LYCHEEJS_HELPER" ]; then
 
 		git_diff=`git diff`;
 
-		if [ `git diff` == "" ]; then
+		if [ "$git_diff" == "" ]; then
 
 			git commit -m ":construction: lychee.js Library $LYCHEEJS_VERSION CI build :construction:";
 			git tag $new_version;
