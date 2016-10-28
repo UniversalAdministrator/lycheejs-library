@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-LYCHEEJS_ROOT=$(cd "$(dirname "$0")/../../../"; pwd);
+LYCHEEJS_ROOT="/opt/lycheejs";
 PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
 LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/bin/fertilizer.sh";
 
