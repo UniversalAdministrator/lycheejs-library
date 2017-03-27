@@ -38,6 +38,7 @@ if [ -x "$LYCHEEJS_HELPER" ]; then
 		sed -i "s|$old_version|$new_version|g"                   ./package.json;
 		sed -i 's|2[0-9][0-9][0-9]-Q[1-4]|'$LYCHEEJS_VERSION'|g' ./README.md;
 
+		git add ./bin;
 		git add ./build;
 		git add ./bower.json;
 		git add ./package.json;
