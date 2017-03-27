@@ -1,19 +1,10 @@
 #!/bin/bash
 
 
-LYCHEEJS_ROOT="/opt/lycheejs";
+LYCHEEJS_ROOT=$(cd "$(dirname "$0")/../../../"; pwd);
 PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
-LYCHEEJS_FERTILIZER=`which lycheejs-fertilizer`;
-LYCHEEJS_HELPER=`which lycheejs-helper`;
-
-if [ "$LYCHEEJS_FERTILIZER" == "" ]; then
-	LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/bin/fertilizer.sh";
-fi;
-
-if [ "$LYCHEEJS_HELPER" == "" ]; then
-	LYCHEEJS_HELPER="$LYCHEEJS_HELPER/bin/helper.sh";
-fi;
-
+LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/bin/fertilizer.sh";
+LYCHEEJS_HELPER="$LYCHEEJS_HELPER/bin/helper.sh";
 
 
 _concat_lychee() {

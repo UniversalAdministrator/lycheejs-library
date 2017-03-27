@@ -18,11 +18,6 @@ PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
 LYCHEEJS_HELPER="$LYCHEEJS_ROOT/bin/helper.sh";
 
 
-if [ ! -x "$LYCHEEJS_HELPER" ]; then
-	LYCHEEJS_HELPER=`which lycheejs-helper`;
-fi;
-
-
 if [ "$NPM_BIN" == "" ]; then
 	echo "FAILURE: Install NPM first.";
 	exit 1;
