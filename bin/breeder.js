@@ -3,7 +3,7 @@
 
 const _fs   = require('fs');
 const _path = require('path');
-const _ROOT = _path.resolve(__dirname, '../');
+const _ROOT = process.env.LYCHEEJS_ROOT || '/opt/lycheejs';
 
 
 
@@ -81,9 +81,9 @@ const _bootup = function(settings) {
 	let environment = new lychee.Environment({
 		id:       'breeder',
 		debug:    settings.debug === true,
-		sandbox:  false,
+		sandbox:  settings.debug === true ? false : true,
 		build:    'breeder.Main',
-		timeout:  1000,
+		timeout:  5000,
 		packages: [
 			new lychee.Package('lychee',     '/libraries/lychee/lychee.pkg'),
 			new lychee.Package('fertilizer', '/libraries/fertilizer/lychee.pkg'),

@@ -3,7 +3,7 @@
 
 const _fs   = require('fs');
 const _path = require('path');
-const _ROOT = _path.resolve(__dirname, '../');
+const _ROOT = process.env.LYCHEEJS_ROOT || '/opt/lycheejs';
 
 
 
@@ -19,7 +19,9 @@ const lychee = require(_ROOT + '/build/node/harvester.js')(_ROOT);
 
 const _print_help = function() {
 
-	let profiles = [].map(function(value) {
+	let profiles = _fs.readdirSync(_ROOT + '/libraries/harvester/profiles').filter(function(value) {
+		return value.endsWith('.json');
+	}).map(function(value) {
 		return '' + value.substr(0, value.indexOf('.json')) + '';
 	});
 
@@ -43,7 +45,7 @@ const _print_help = function() {
 	console.log('                                                            ');
 	console.log('Available Flags:                                            ');
 	console.log('                                                            ');
-	console.log('   --debug          Debug Mode with verbose debug messages  ');
+	console.log('   --debug          Debug Mode with debug messages          ');
 	console.log('   --sandbox        Sandbox Mode without software bots      ');
 	console.log('                                                            ');
 	console.log('Examples:                                                   ');
@@ -63,7 +65,7 @@ const _clear_pid = function() {
 		_fs.unlinkSync(_ROOT + '/bin/harvester.pid');
 		return true;
 
-	} catch(e) {
+	} catch (err) {
 
 		return false;
 
@@ -83,7 +85,7 @@ const _read_pid = function() {
 			pid = parseInt(pid, 10);
 		}
 
-	} catch(e) {
+	} catch (err) {
 		pid = null;
 	}
 
@@ -98,7 +100,7 @@ const _write_pid = function() {
 		_fs.writeFileSync(_ROOT + '/bin/harvester.pid', process.pid);
 		return true;
 
-	} catch(e) {
+	} catch (err) {
 
 		return false;
 
@@ -115,7 +117,7 @@ const _bootup = function(settings) {
 		debug:    settings.debug === true,
 		sandbox:  true,
 		build:    'harvester.Main',
-		timeout:  3000,
+		timeout:  5000,
 		packages: [
 			new lychee.Package('lychee',    '/libraries/lychee/lychee.pkg'),
 			new lychee.Package('harvester', '/libraries/harvester/lychee.pkg')
@@ -151,12 +153,19 @@ const _bootup = function(settings) {
 			_write_pid();
 
 
-			process.on('SIGHUP',  function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
-			process.on('SIGINT',  function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
-			process.on('SIGQUIT', function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
-			process.on('SIGABRT', function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
-			process.on('SIGTERM', function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
-			process.on('error',   function() { _clear_pid(); sandbox.MAIN.destroy(); this.exit(1); });
+			const _on_process_error = function() {
+				_clear_pid();
+				sandbox.MAIN.destroy();
+				process.exit(1);
+			};
+
+
+			process.on('SIGHUP',  _on_process_error);
+			process.on('SIGINT',  _on_process_error);
+			process.on('SIGQUIT', _on_process_error);
+			process.on('SIGABRT', _on_process_error);
+			process.on('SIGTERM', _on_process_error);
+			process.on('error',   _on_process_error);
 			process.on('exit',    function() {});
 
 
@@ -214,13 +223,13 @@ const _SETTINGS = (function() {
 
 			try {
 
-				let stat1 = _fs.lstatSync(_ROOT + '/bin/harvester/' + profile + '.json');
+				let stat1 = _fs.lstatSync(_ROOT + '/libraries/harvester/profiles/' + profile + '.json');
 				if (stat1.isFile()) {
 
 					let json = null;
 					try {
-						json = JSON.parse(_fs.readFileSync(_ROOT + '/bin/harvester/' + profile + '.json', 'utf8'));
-					} catch(e) {
+						json = JSON.parse(_fs.readFileSync(_ROOT + '/libraries/harvester/profiles/' + profile + '.json', 'utf8'));
+					} catch (err) {
 					}
 
 					if (json !== null) {
@@ -231,7 +240,7 @@ const _SETTINGS = (function() {
 
 				}
 
-			} catch(e) {
+			} catch (err) {
 			}
 
 		}
@@ -265,7 +274,6 @@ const _SETTINGS = (function() {
 	 */
 
 	let action      = settings.action;
-	let has_action  = settings.action !== null;
 	let has_profile = settings.profile !== null;
 
 
@@ -302,7 +310,7 @@ const _SETTINGS = (function() {
 				process.kill(pid, 'SIGTERM');
 				killed = true;
 
-			} catch(err) {
+			} catch (err) {
 
 				if (err.code === 'ESRCH') {
 					killed = true;
