@@ -38,7 +38,8 @@ const _GENERIC_FILTERS = [
 const _LYCHEE = 'const lychee = require(_ROOT + \'/libraries/lychee/build/node/core.js\')(_ROOT);';
 const _build  = function(identifier) {
 
-	let path = '/opt/lycheejs/bin/' + identifier + '.js';
+	let root = process.env.LYCHEEJS_ROOT || '/opt/lycheejs';
+	let path = root + '/libraries/' + identifier + '/bin/' + identifier + '.js';
 	let file = _fs.readFileSync(path).toString('utf8');
 
 	file = file.split('\n').map(function(line, l) {

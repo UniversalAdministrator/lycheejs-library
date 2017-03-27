@@ -4,7 +4,7 @@
 LYCHEEJS_ROOT=$(cd "$(dirname "$0")/../../../"; pwd);
 PROJECT_ROOT=$(cd "$(dirname "$0")/../"; pwd);
 LYCHEEJS_FERTILIZER="$LYCHEEJS_ROOT/libraries/fertilizer/bin/fertilizer.sh";
-LYCHEEJS_HELPER="$LYCHEEJS_HELPER/bin/helper.sh";
+LYCHEEJS_HELPER="$LYCHEEJS_ROOT/bin/helper.sh";
 
 
 _concat_lychee() {
@@ -49,7 +49,6 @@ _concat_library() {
 	echo -e "\n" >> $target;
 
 }
-
 
 
 if [ -x "$LYCHEEJS_FERTILIZER" ] && [ -x "$LYCHEEJS_HELPER" ]; then
