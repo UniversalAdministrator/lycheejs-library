@@ -420,7 +420,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 			lychee:  '/opt/lycheejs',
 			project: null
 		},
-		VERSION:      "2017-Q1",
+		VERSION:      "2017-Q2",
 
 
 
@@ -430,40 +430,50 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 
 		diff: function(aobject, bobject) {
 
-			let akeys = Object.keys(aobject);
-			let bkeys = Object.keys(bobject);
+			if (aobject instanceof Object && bobject instanceof Object) {
 
-			if (akeys.length !== bkeys.length) {
-				return true;
-			}
+				let akeys = Object.keys(aobject);
+				let bkeys = Object.keys(bobject);
+
+				if (akeys.length !== bkeys.length) {
+					return true;
+				}
 
 
-			for (let a = 0, al = akeys.length; a < al; a++) {
+				for (let a = 0, al = akeys.length; a < al; a++) {
 
-				let key = akeys[a];
+					let key = akeys[a];
 
-				if (bobject[key] !== undefined) {
+					if (bobject[key] !== undefined) {
 
-					if (aobject[key] !== null && bobject[key] !== null) {
+						if (aobject[key] !== null && bobject[key] !== null) {
 
-						if (aobject[key] instanceof Object && bobject[key] instanceof Object) {
+							if (aobject[key] instanceof Object && bobject[key] instanceof Object) {
 
-							if (lychee.diff(aobject[key], bobject[key]) === true) {
+								if (lychee.diff(aobject[key], bobject[key]) === true) {
 
-								// Allows aobject[key].builds = {} and bobject[key].builds = { stuff: {}}
-								if (Object.keys(aobject[key]).length > 0) {
-									return true;
+									// Allows aobject[key].builds = {} and bobject[key].builds = { stuff: {}}
+									if (Object.keys(aobject[key]).length > 0) {
+										return true;
+									}
+
 								}
 
+							} else if (typeof aobject[key] !== typeof bobject[key]) {
+								return true;
 							}
 
-						} else if (typeof aobject[key] !== typeof bobject[key]) {
-							return true;
 						}
 
+					} else {
+						return true;
 					}
 
-				} else {
+				}
+
+			} else {
+
+				if (aobject !== bobject) {
 					return true;
 				}
 
@@ -919,7 +929,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 				definition.exports = function(callback) {
 
 					lychee.Definition.prototype.exports.call(this, callback);
-					that.environment.define(this);
+					that.environment.define(this, false);
 
 				};
 
@@ -1013,7 +1023,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 				if (_environment !== null) {
 
 					Object.values(_environment.definitions).forEach(function(definition) {
-						environment.define(definition);
+						environment.define(definition, true);
 					});
 
 				}
@@ -1088,7 +1098,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 								if (_environment !== null) {
 
 									Object.values(_environment.definitions).forEach(function(definition) {
-										environment.define(definition);
+										environment.define(definition, true);
 									});
 
 								}
@@ -1162,7 +1172,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 					let that = this;
 
 					Object.values(environment.definitions).forEach(function(definition) {
-						that.environment.define(definition);
+						that.environment.define(definition, true);
 					});
 
 					let build_old = this.environment.definitions[this.environment.build] || null;
@@ -1233,8 +1243,8 @@ lychee.Asset = typeof lychee.Asset !== 'undefined' ? lychee.Asset : (function(gl
 		let construct = null;
 
 
-		if (type === 'json')  construct = global.Config;
 		if (type === 'fnt')   construct = global.Font;
+		if (type === 'json')  construct = global.Config;
 		if (type === 'msc')   construct = global.Music;
 		if (type === 'pkg')   construct = global.Config;
 		if (type === 'png')   construct = global.Texture;
@@ -1379,7 +1389,9 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 
 	const _report_error = function(environment, data) {
 
+		let info = 'Report from ' + data.file + '#L' + data.line + ' in ' + data.method;
 		let main = environment.global.MAIN || null;
+
 		if (main !== null) {
 
 			let client = main.client || null;
@@ -1387,7 +1399,7 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 
 				let service = client.getService('debugger');
 				if (service !== null) {
-					service.report('lychee.Debugger: Report from ' + data.file + '#L' + data.line + ' in ' + data.method + '', data);
+					service.report('lychee.Debugger: ' + info, data);
 				}
 
 			}
@@ -1395,8 +1407,8 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 		}
 
 
-		console.error('lychee.Debugger: Report from ' + data.file + '#L' + data.line + ' in ' + data.method + '');
-		console.error('lychee.Debugger:             ' + data.definition + ' - "' + data.message + '"');
+		console.error('lychee.Debugger: ' + info);
+		console.error('lychee.Debugger: ' + data.message.trim());
 
 	};
 
@@ -1653,6 +1665,7 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 
 			if (pkg !== null) {
 
+				let id    = '';
 				let tmp_i = ns.indexOf('source');
 				let tmp_s = ns[ns.length - 1];
 
@@ -1660,15 +1673,12 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 					ns[ns.length - 1] = tmp_s.split('.').slice(0, -1).join('.');
 				}
 
-				let classId = '';
 				if (tmp_i !== -1) {
-					classId = ns.slice(tmp_i + 1).join('.');
+					id = ns.slice(tmp_i + 1).join('.');
 				}
 
 
-				this.id        = pkg.id + '.' + classId;
-				this.classId   = classId;
-				this.packageId = pkg.id;
+				this.id = pkg.id + '.' + id;
 
 			}
 
@@ -1687,26 +1697,18 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 		id = typeof id === 'string' ? id : '';
 
 
-		this.id        = '';
-		this.classId   = '';
-		this.packageId = '';
+		this.id     = '';
 
-		this.__file    = lychee.Environment.__FILENAME || null;
+		this.__file = lychee.Environment.__FILENAME || null;
 
 
 		if (/\./.test(id)) {
 
-			let tmp = id.split('.');
+			this.id = id;
 
-			this.id        = id;
-			this.classId   = tmp.slice(1).join('.');
-			this.packageId = tmp[0];
+		} else if (/^([A-Za-z0-9\.]+)/g.test(id)) {
 
-		} else if (/^([A-Za-z0-9\.]+)/g.test(id) === true) {
-
-			this.id        = 'lychee.' + id;
-			this.classId   = id;
-			this.packageId = 'lychee';
+			this.id = 'lychee.' + id;
 
 		} else {
 
@@ -1871,7 +1873,7 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 				for (let id in map) {
 
 					let value = map[id];
-					if (value instanceof Font || value instanceof Music || value instanceof Sound || value instanceof Texture || value !== undefined) {
+					if (value !== undefined) {
 						this._attaches[id] = map[id];
 					}
 
@@ -2305,14 +2307,13 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		let dependencies = [];
 
-
 		if (definition instanceof lychee.Definition) {
 
 			for (let i = 0, il = definition._includes.length; i < il; i++) {
 
-				let inc      = definition._includes[i];
-				let incclass = _get_class.call(this.global, inc);
-				if (incclass === null) {
+				let inc   = definition._includes[i];
+				let check = _get_composite.call(this.global, inc);
+				if (check === null) {
 					dependencies.push(inc);
 				}
 
@@ -2320,9 +2321,9 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 			for (let r = 0, rl = definition._requires.length; r < rl; r++) {
 
-				let req      = definition._requires[r];
-				let reqclass = _get_class.call(this.global, req);
-				if (reqclass === null) {
+				let req   = definition._requires[r];
+				let check = _get_composite.call(this.global, req);
+				if (check === null) {
 					dependencies.push(req);
 				}
 
@@ -2330,20 +2331,19 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		}
 
-
 		return dependencies;
 
 	};
 
 	const _export_definition = function(definition) {
 
-		if (_get_class.call(this.global, definition.id) !== null) {
+		if (_get_composite.call(this.global, definition.id) !== null) {
 			return false;
 		}
 
 
 		let namespace  = _get_namespace.call(this.global, definition.id);
-		let identifier = definition.classId.split('.').pop();
+		let identifier = definition.id.split('.').pop();
 
 
 		if (this.debug === true) {
@@ -2541,7 +2541,7 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 	};
 
-	const _get_class = function(identifier) {
+	const _get_composite = function(identifier) {
 
 		let id = identifier.split('.').pop();
 
@@ -3031,8 +3031,9 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 			if (identifier !== null) {
 
-				let packageId = identifier.split('.')[0];
-				let classId   = identifier.split('.').slice(1).join('.');
+				let tmp    = identifier.split('.');
+				let pkg_id = tmp[0];
+				let def_id = tmp.slice(1).join('.');
 
 
 				let definition = this.definitions[identifier] || null;
@@ -3043,12 +3044,12 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 				} else {
 
 					let pkg = this.packages.find(function(pkg) {
-						return pkg.id === packageId;
+						return pkg.id === pkg_id;
 					}) || null;
 
 					if (pkg !== null && pkg.isReady() === true) {
 
-						let result = pkg.load(classId, this.tags);
+						let result = pkg.load(def_id, this.tags);
 						if (result === true) {
 
 							if (this.debug === true) {
@@ -3071,21 +3072,25 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		},
 
-		define: function(definition) {
+		define: function(definition, inject) {
 
-			let filename = Composite.__FILENAME || null;
-			if (filename !== null) {
+			definition = definition instanceof lychee.Definition ? definition : null;
+			inject     = inject === true;
 
-				if (definition instanceof lychee.Definition) {
 
-					let oldPackageId = definition.packageId;
-					let newPackageId = null;
+			if (definition !== null) {
+
+				let filename = Composite.__FILENAME || null;
+				if (inject === false && filename !== null) {
+
+					let old_pkg_id = definition.id.split('.')[0];
+					let new_pkg_id = null;
 
 					for (let p = 0, pl = this.packages.length; p < pl; p++) {
 
 						let root = this.packages[p].root;
 						if (filename.substr(0, root.length) === root) {
-							newPackageId = this.packages[p].id;
+							new_pkg_id = this.packages[p].id;
 							break;
 						}
 
@@ -3097,7 +3102,7 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 					for (let p = 0, pl = this.packages.length; p < pl; p++) {
 
 						let id = this.packages[p].id;
-						if (id === oldPackageId || id === newPackageId) {
+						if (id === old_pkg_id || id === new_pkg_id) {
 							assimilation = false;
 							break;
 						}
@@ -3114,21 +3119,20 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 						this.__cache.assimilations.push(definition.id);
 
-					} else if (newPackageId !== null && newPackageId !== oldPackageId) {
+					} else if (new_pkg_id !== null && new_pkg_id !== old_pkg_id) {
 
 						if (this.debug === true) {
-							this.global.console.log('lychee-Environment (' + this.id + '): Injecting Definition "' + definition.id + '" as "' + newPackageId + '.' + definition.classId + '"');
+							this.global.console.log('lychee-Environment (' + this.id + '): Injecting Definition "' + definition.id + '" into package "' + new_pkg_id + '"');
 						}
 
 
-						definition.packageId = newPackageId;
-						definition.id        = definition.packageId + '.' + definition.classId;
+						definition.id = new_pkg_id + '.' + definition.id.split('.').slice(1).join('.');
 
 						for (let i = 0, il = definition._includes.length; i < il; i++) {
 
 							let inc = definition._includes[i];
-							if (inc.substr(0, oldPackageId.length) === oldPackageId) {
-								definition._includes[i] = newPackageId + inc.substr(oldPackageId.length);
+							if (inc.substr(0, old_pkg_id.length) === old_pkg_id) {
+								definition._includes[i] = new_pkg_id + inc.substr(old_pkg_id.length);
 							}
 
 						}
@@ -3136,40 +3140,43 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 						for (let r = 0, rl = definition._requires.length; r < rl; r++) {
 
 							let req = definition._requires[r];
-							if (req.substr(0, oldPackageId.length) === oldPackageId) {
-								definition._requires[r] = newPackageId + req.substr(oldPackageId.length);
+							if (req.substr(0, old_pkg_id.length) === old_pkg_id) {
+								definition._requires[r] = new_pkg_id + req.substr(old_pkg_id.length);
 							}
 
 						}
 
 					}
 
+				} else {
+
+					// XXX: Direct injection has no auto-mapping
+
+				}
+
+
+				if (_validate_definition.call(this, definition) === true) {
+
+					if (this.debug === true) {
+						let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
+						this.global.console.log('lychee-Environment (' + this.id + '): Mapping "' + definition.id + '" ' + info);
+					}
+
+					this.definitions[definition.id] = definition;
+
+
+					return true;
+
 				}
 
 			}
 
 
-			if (_validate_definition.call(this, definition) === true) {
-
-				if (this.debug === true) {
-					let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
-					this.global.console.log('lychee-Environment (' + this.id + '): Mapping "' + definition.id + '" ' + info);
-				}
-
-				this.definitions[definition.id] = definition;
+			let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
+			this.global.console.error('lychee-Environment (' + this.id + '): Invalid Definition "' + definition.id + '" ' + info);
 
 
-				return true;
-
-			} else {
-
-				let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
-				this.global.console.error('lychee-Environment (' + this.id + '): Invalid Definition "' + definition.id + '" ' + info);
-
-
-				return false;
-
-			}
+			return false;
 
 		},
 
@@ -3336,7 +3343,13 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -3410,7 +3423,10 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setDebug: function(debug) {
 
-			if (debug === true || debug === false) {
+			debug = typeof debug === 'boolean' ? debug : null;
+
+
+			if (debug !== null) {
 
 				this.debug = debug;
 
@@ -3461,7 +3477,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 			if (id !== null) {
 
 				this.id = id;
-
 
 				return true;
 
@@ -3514,8 +3529,10 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setSandbox: function(sandbox) {
 
-			if (sandbox === true || sandbox === false) {
+			sandbox = typeof sandbox === 'boolean' ? sandbox : null;
 
+
+			if (sandbox !== null) {
 
 				if (sandbox !== this.sandbox) {
 
@@ -3554,7 +3571,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 				this.tags = {};
 
-
 				for (let type in tags) {
 
 					let values = tags[type];
@@ -3567,7 +3583,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 					}
 
 				}
-
 
 				return true;
 
@@ -3598,17 +3613,22 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setType: function(type) {
 
-			if (type === 'source' || type === 'export' || type === 'build') {
-
-				this.type = type;
+			type = typeof type === 'string' ? type : null;
 
 
-				for (let p = 0, pl = this.packages.length; p < pl; p++) {
-					this.packages[p].setType(this.type);
+			if (type !== null) {
+
+				if (type === 'source' || type === 'export' || type === 'build') {
+
+					this.type = type;
+
+					for (let p = 0, pl = this.packages.length; p < pl; p++) {
+						this.packages[p].setType(this.type);
+					}
+
+					return true;
+
 				}
-
-
-				return true;
 
 			}
 
@@ -3979,9 +3999,6 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		url = typeof url === 'string' ? url : null;
 
 
-		// This is public to allow loading packages
-		// as external renamespaced libraries
-
 		this.id   = id;
 		this.url  = null;
 		this.root = null;
@@ -4204,24 +4221,33 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 
 	const _load_asset = function(settings, callback, scope) {
 
-		let path     = lychee.environment.resolve(settings.url);
-		let encoding = settings.encoding === 'binary' ? 'binary' : 'utf8';
+		settings = settings instanceof Object   ? settings : null;
+		callback = callback instanceof Function ? callback : null;
+		scope    = scope !== undefined          ? scope    : null;
 
 
-		_fs.readFile(path, encoding, function(error, buffer) {
+		if (settings !== null && callback !== null && scope !== null) {
 
-			let raw = null;
-			if (!error) {
-				raw = buffer;
-			}
+			let path     = lychee.environment.resolve(settings.url);
+			let encoding = settings.encoding === 'binary' ? 'binary' : 'utf8';
 
-			try {
-				callback.call(scope, raw);
-			} catch (err) {
-				lychee.Debugger.report(lychee.environment, err, null);
-			}
 
-		});
+			_fs.readFile(path, encoding, function(error, buffer) {
+
+				let raw = null;
+				if (!error) {
+					raw = buffer;
+				}
+
+				try {
+					callback.call(scope, raw);
+				} catch (err) {
+					lychee.Debugger.report(lychee.environment, err, null);
+				}
+
+			});
+
+		}
 
 	};
 
@@ -4231,16 +4257,15 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 	 * POLYFILLS
 	 */
 
-	const _log     = console.log   || function() {};
-	const _info    = console.info  || console.log;
-	const _warn    = console.warn  || console.log;
-	const _error   = console.error || console.log;
-	let   _std_out = '';
-	let   _std_err = '';
+	let _std_out = '';
+	let _std_err = '';
 
 	const _INDENT         = '    ';
 	const _WHITESPACE     = new Array(512).fill(' ').join('');
 	const _args_to_string = function(args, offset) {
+
+		offset = typeof offset === 'number' ? offset : null;
+
 
 		let output  = [];
 		let columns = process.stdout.columns;
@@ -4324,29 +4349,43 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		let ol = output.length;
 		if (ol > 1) {
 
-			for (let o = 0; o < ol; o++) {
+			if (offset !== null) {
 
-				let line = output[o];
-				let maxl = (o === 0 || o === ol - 1) ? (columns - offset) : columns;
-				if (line.length > maxl) {
-					output[o] = line.substr(0, maxl);
-				} else {
-					output[o] = line + _WHITESPACE.substr(0, maxl - line.length);
+				for (let o = 0; o < ol; o++) {
+
+					let line = output[o];
+					let maxl = (o === 0 || o === ol - 1) ? (columns - offset) : columns;
+					if (line.length > maxl) {
+						output[o] = line.substr(0, maxl);
+					} else {
+						output[o] = line + _WHITESPACE.substr(0, maxl - line.length);
+					}
+
 				}
 
 			}
+
 
 			return output.join('\n');
 
 		} else {
 
-			let line = output[0];
-			let maxl = columns - offset * 2;
-			if (line.length > maxl) {
-				return line.substr(0, maxl);
-			} else {
-				return line + _WHITESPACE.substr(0, maxl - line.length);
+			if (offset !== null) {
+
+				let line = output[0];
+				let maxl = columns - offset * 2;
+				if (line.length > maxl) {
+					line = line.substr(0, maxl);
+				} else {
+					line = line + _WHITESPACE.substr(0, maxl - line.length);
+				}
+
+				return line;
+
 			}
+
+
+			return output[0];
 
 		}
 
@@ -4373,13 +4412,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_log.call(console,
-			' ',
-			_args_to_string(args, 2),
-			' '
-		);
+		process.stdout.write('\u001b[49m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4391,15 +4426,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_info.call(console,
-			'\u001b[37m',
-			'\u001b[42m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stdout.write('\u001b[42m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4411,15 +4440,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_warn.call(console,
-			'\u001b[37m',
-			'\u001b[43m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stdout.write('\u001b[43m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4431,15 +4454,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_err += args.join('\t') + '\n';
+		_std_err += _args_to_string(args) + '\n';
 
-		_error.call(console,
-			'\u001b[37m',
-			'\u001b[41m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stderr.write('\u001b[41m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4897,18 +4914,26 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		}
 
 
+		_parse_font_characters.call(this);
+
+	};
+
+	const _parse_font_characters = function() {
+
+		let data = this.__buffer;
+		let url  = this.url;
+
+		if (_CHAR_CACHE[url] === undefined) {
+			_CHAR_CACHE[url] = {};
+		}
+
 		if (data.map instanceof Array) {
 
 			let offset = this.spacing;
-			let url    = this.url;
-
-			if (_CHAR_CACHE[url] === undefined) {
-				_CHAR_CACHE[url] = {};
-			}
 
 			for (let c = 0, cl = this.charset.length; c < cl; c++) {
 
-				let id = this.charset[c];
+				let id  = this.charset[c];
 				let chr = {
 					width:      data.map[c] + this.spacing * 2,
 					height:     this.lineheight,
@@ -5035,49 +5060,133 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			text = typeof text === 'string' ? text : null;
 
 
-			let cache = _CHAR_CACHE[this.url] || null;
-			if (cache !== null) {
+			let buffer = this.__buffer;
+			if (buffer !== null) {
 
-				let tl = text.length;
-				if (tl === 1) {
+				// Cache Usage
+				if (this.__load === false) {
 
-					if (cache[text] !== undefined) {
-						return cache[text];
-					}
+					let cache = _CHAR_CACHE[this.url] || null;
+					if (cache !== null) {
 
-				} else if (tl > 1) {
+						let tl = text.length;
+						if (tl === 1) {
 
-					let data = cache[text] || null;
-					if (data === null) {
+							if (cache[text] !== undefined) {
+								return cache[text];
+							}
 
-						let width = 0;
+						} else if (tl > 1) {
 
-						for (let t = 0; t < tl; t++) {
-							let chr = this.measure(text[t]);
-							width  += chr.realwidth + this.kerning;
+							let data = cache[text] || null;
+							if (data === null) {
+
+								let width = 0;
+								let map   = buffer.map;
+
+								for (let t = 0; t < tl; t++) {
+
+									let m = this.charset.indexOf(text[t]);
+									if (m !== -1) {
+										width += map[m] + this.kerning;
+									}
+
+								}
+
+								if (width > 0) {
+
+									// TODO: Embedded Font ligatures will set x and y values based on settings.map
+									data = cache[text] = {
+										width:      width,
+										height:     this.lineheight,
+										realwidth:  width,
+										realheight: this.lineheight,
+										x:          0,
+										y:          0
+									};
+
+								}
+
+							}
+
+
+							return data;
+
 						}
 
 
-						// TODO: Embedded Font ligatures will set x and y values based on settings.map
+						return cache[''];
 
-						data = cache[text] = {
-							width:      width,
-							height:     this.lineheight,
-							realwidth:  width,
-							realheight: this.lineheight,
-							x:          0,
-							y:          0
-						};
+					}
+
+				// Temporary Usage
+				} else {
+
+					let tl = text.length;
+					if (tl === 1) {
+
+						let m = this.charset.indexOf(text);
+						if (m !== -1) {
+
+							let offset  = this.spacing;
+							let spacing = this.spacing;
+							let map     = buffer.map;
+
+							for (let c = 0; c < m; c++) {
+								offset += map[c] + spacing * 2;
+							}
+
+							return {
+								width:      map[m] + spacing * 2,
+								height:     this.lineheight,
+								realwidth:  map[m],
+								realheight: this.lineheight,
+								x:          offset - spacing,
+								y:          0
+							};
+
+						}
+
+					} else if (tl > 1) {
+
+						let width = 0;
+						let map   = buffer.map;
+
+						for (let t = 0; t < tl; t++) {
+
+							let m = this.charset.indexOf(text[t]);
+							if (m !== -1) {
+								width += map[m] + this.kerning;
+							}
+
+						}
+
+						if (width > 0) {
+
+							return {
+								width:      width,
+								height:     this.lineheight,
+								realwidth:  width,
+								realheight: this.lineheight,
+								x:          0,
+								y:          0
+							};
+
+						}
 
 					}
 
 
-					return data;
+					return {
+						width:      0,
+						height:     this.lineheight,
+						realwidth:  0,
+						realheight: this.lineheight,
+						x:          0,
+						y:          0
+					};
 
 				}
-
-
-				return cache[''];
 
 			}
 
@@ -5695,11 +5804,11 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 
 			_filename = stuff.url;
 
+
 			let cid = lychee.environment.resolve(stuff.url);
 			if (require.cache[cid] !== undefined) {
 				delete require.cache[cid];
 			}
-
 
 			try {
 				require(cid);
@@ -6224,7 +6333,10 @@ lychee.define('Input').tags({
 
 		setKey: function(key) {
 
-			if (key === true || key === false) {
+			key = typeof key === 'boolean' ? key : null;
+
+
+			if (key !== null) {
 
 				this.key = key;
 
@@ -6239,7 +6351,10 @@ lychee.define('Input').tags({
 
 		setKeyModifier: function(keymodifier) {
 
-			if (keymodifier === true || keymodifier === false) {
+			keymodifier = typeof keymodifier === 'boolean' ? keymodifier : null;
+
+
+			if (keymodifier !== null) {
 
 				this.keymodifier = keymodifier;
 
@@ -6254,9 +6369,31 @@ lychee.define('Input').tags({
 
 		setTouch: function(touch) {
 
-			if (touch === true || touch === false) {
-				return false;
+			touch = typeof touch === 'boolean' ? touch : null;
+
+
+			if (touch !== null) {
+
+				// XXX: No touch support
+
 			}
+
+
+			return false;
+
+		},
+
+		setScroll: function(scroll) {
+
+			scroll = typeof scroll === 'boolean' ? scroll : null;
+
+
+			if (scroll !== null) {
+
+				// XXX: No scroll support
+
+			}
+
 
 			return false;
 
@@ -6264,9 +6401,15 @@ lychee.define('Input').tags({
 
 		setSwipe: function(swipe) {
 
-			if (swipe === true || swipe === false) {
-				return false;
+			swipe = typeof swipe === 'boolean' ? swipe : null;
+
+
+			if (swipe !== null) {
+
+				// XXX: No swipe support
+
 			}
+
 
 			return false;
 
@@ -6411,6 +6554,8 @@ lychee.define('Renderer').tags({
 
 		destroy: function() {
 
+			return true;
+
 		},
 
 
@@ -6455,10 +6600,17 @@ lychee.define('Renderer').tags({
 			if (alpha !== null) {
 
 				if (alpha >= 0 && alpha <= 1) {
+
 					this.alpha = alpha;
+
+					return true;
+
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -6468,8 +6620,15 @@ lychee.define('Renderer').tags({
 
 
 			if (color !== null) {
+
 				this.background = color;
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -6479,8 +6638,15 @@ lychee.define('Renderer').tags({
 
 
 			if (id !== null) {
+
 				this.id = id;
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -6500,6 +6666,9 @@ lychee.define('Renderer').tags({
 			this.__ctx = this.__buffer.__ctx;
 			this.offset.x = 0;
 
+
+			return true;
+
 		},
 
 		setHeight: function(height) {
@@ -6517,6 +6686,9 @@ lychee.define('Renderer').tags({
 			this.__buffer.resize(this.width, this.height);
 			this.__ctx = this.__buffer.__ctx;
 			this.offset.y = 0;
+
+
+			return true;
 
 		},
 
@@ -6543,6 +6715,9 @@ lychee.define('Renderer').tags({
 
 			}
 
+
+			return true;
+
 		},
 
 		flush: function() {
@@ -6560,10 +6735,18 @@ lychee.define('Renderer').tags({
 				_process.stdout.write(ctx[y].join('') + '\n');
 			}
 
+			return true;
+
 		},
 
 		createBuffer: function(width, height) {
+
+			width  = typeof width === 'number'  ? width  : 1;
+			height = typeof height === 'number' ? height : 1;
+
+
 			return new _Buffer(width, height);
+
 		},
 
 		setBuffer: function(buffer) {
@@ -6577,6 +6760,9 @@ lychee.define('Renderer').tags({
 				this.__ctx = this.__buffer.__ctx;
 			}
 
+
+			return true;
+
 		},
 
 
@@ -6587,14 +6773,22 @@ lychee.define('Renderer').tags({
 
 		drawArc: function(x, y, start, end, radius, color, background, lineWidth) {
 
-			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
+			x          = x | 0;
+			y          = y | 0;
+			radius     = radius | 0;
+			start      = typeof start === 'number'              ? start     : 0;
+			end        = typeof end === 'number'                ? end       : 2;
+			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color     : '#000000';
 			background = background === true;
-			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
+			lineWidth  = typeof lineWidth === 'number'          ? lineWidth : 1;
 
 
 			// TODO: Implement arc-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 			// let pi2 = Math.PI * 2;
+
+
+			return false;
 
 		},
 
@@ -6602,11 +6796,10 @@ lychee.define('Renderer').tags({
 
 			if (this.alpha < 0.5) return;
 
-			x1 = x1 | 0;
-			y1 = y1 | 0;
-			x2 = x2 | 0;
-			y2 = y2 | 0;
-
+			x1         = x1 | 0;
+			y1         = y1 | 0;
+			x2         = x2 | 0;
+			y2         = y2 | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6652,36 +6845,88 @@ lychee.define('Renderer').tags({
 				_draw_ctx.call(ctx, x, y, '|');
 			}
 
+
+			return true;
+
 		},
 
-		drawBuffer: function(x1, y1, buffer) {
+		drawBuffer: function(x1, y1, buffer, map) {
 
+			x1     = x1 | 0;
+			y1     = y1 | 0;
 			buffer = buffer instanceof _Buffer ? buffer : null;
+			map    = map instanceof Object     ? map    : null;
 
 
 			if (buffer !== null) {
 
-				let ctx = this.__ctx;
+				let ctx    = this.__ctx;
+				let width  = 0;
+				let height = 0;
+				let x      = 0;
+				let y      = 0;
+				let r      = 0;
 
 
-				let x2 = Math.min(x1 + buffer.width,  this.__buffer.width);
-				let y2 = Math.min(y1 + buffer.height, this.__buffer.height);
+				// XXX: No support for alpha :(
 
+				if (map === null) {
 
-				for (let y = y1; y < y2; y++) {
+					width  = buffer.width;
+					height = buffer.height;
 
-					for (let x = x1; x < x2; x++) {
-						ctx[y][x] = buffer.__ctx[y - y1][x - x1];
+					let x2 = Math.min(x1 + width,  this.__buffer.width);
+					let y2 = Math.min(y1 + height, this.__buffer.height);
+
+					for (let cy = y1; cy < y2; cy++) {
+
+						for (let cx = x1; cx < x2; cx++) {
+							ctx[cy][cx] = buffer.__ctx[cy - y1][cx - x1];
+						}
+
+					}
+
+				} else {
+
+					width  = map.w;
+					height = map.h;
+					x      = map.x;
+					y      = map.y;
+					r      = map.r || 0;
+
+					if (r === 0) {
+
+						let x2 = Math.min(x1 + width,  this.__buffer.width);
+						let y2 = Math.min(y1 + height, this.__buffer.height);
+
+						for (let cy = y1; cy < y2; cy++) {
+
+							for (let cx = x1; cx < x2; cx++) {
+								ctx[cy][cx] = buffer.__ctx[cy - y1 + y][cx - x1 + x];
+							}
+
+						}
+
+					} else {
+
+						// XXX: No support for rotation
+
 					}
 
 				}
 
 			}
 
+
+			return true;
+
 		},
 
 		drawCircle: function(x, y, radius, color, background, lineWidth) {
 
+			x          = x | 0;
+			y          = y | 0;
+			radius     = radius | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6690,10 +6935,17 @@ lychee.define('Renderer').tags({
 			// TODO: Implement circle-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return true;
+
 		},
 
 		drawLine: function(x1, y1, x2, y2, color, lineWidth) {
 
+			x1        = x1 | 0;
+			y1        = y1 | 0;
+			x2        = x2 | 0;
+			y2        = y2 | 0;
 			color     = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			lineWidth = typeof lineWidth === 'number' ? lineWidth : 1;
 
@@ -6701,10 +6953,19 @@ lychee.define('Renderer').tags({
 			// TODO: Implement line-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return false;
+
 		},
 
 		drawTriangle: function(x1, y1, x2, y2, x3, y3, color, background, lineWidth) {
 
+			x1         = x1 | 0;
+			y1         = y1 | 0;
+			x2         = x2 | 0;
+			y2         = y2 | 0;
+			x3         = x3 | 0;
+			y3         = y3 | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6713,10 +6974,18 @@ lychee.define('Renderer').tags({
 			// TODO: Implement triangle-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return false;
+
 		},
 
 		// points, x1, y1, [ ... x(a), y(a) ... ], [ color, background, lineWidth ]
 		drawPolygon: function(points, x1, y1) {
+
+			points = typeof points === 'number' ? points : 0;
+			x1     = x1 | 0;
+			y1     = y1 | 0;
+
 
 			// TODO: Implement polygon-drawing ASCII art algorithm
 			// let l = arguments.length;
@@ -6746,6 +7015,8 @@ lychee.define('Renderer').tags({
 				// }
 
 
+				// x1         = x1 | 0;
+				// y1         = y1 | 0;
 				// color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 				// background = background === true;
 				// lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6755,10 +7026,15 @@ lychee.define('Renderer').tags({
 
 			// }
 
+
+			return false;
+
 		},
 
 		drawSprite: function(x1, y1, texture, map) {
 
+			x1      = x1 | 0;
+			y1      = y1 | 0;
 			texture = texture instanceof Texture ? texture : null;
 			map     = map instanceof Object      ? map     : null;
 
@@ -6774,11 +7050,17 @@ lychee.define('Renderer').tags({
 
 			}
 
+
+			return false;
+
 		},
 
 		drawText: function(x1, y1, text, font, center) {
 
-			font   = font instanceof Font ? font : null;
+			x1     = x1 | 0;
+			y1     = y1 | 0;
+			text   = typeof text === 'string' ? text : null;
+			font   = font instanceof Font     ? font : null;
 			center = center === true;
 
 
@@ -6788,17 +7070,13 @@ lychee.define('Renderer').tags({
 
 					let dim = font.measure(text);
 
-					x1 -= dim.realwidth / 2;
-					y1 -= (dim.realheight - font.baseline) / 2;
+					x1 = (x1 - dim.realwidth / 2) | 0;
+					y1 = (y1 - (dim.realheight - font.baseline) / 2) | 0;
 
 				}
 
 
-				y1 -= font.baseline / 2;
-
-
-				x1 = x1 | 0;
-				y1 = y1 | 0;
+				y1 = (y1 - font.baseline / 2) | 0;
 
 
 				let ctx = this.__ctx;
@@ -6822,9 +7100,15 @@ lychee.define('Renderer').tags({
 
 					}
 
+
+					return true;
+
 				}
 
 			}
+
+
+			return false;
 
 		}
 
@@ -7366,11 +7650,10 @@ lychee.define('Stash').tags({
 
 				let result = true;
 				let that   = this;
-				let il     = ids.length;
 
 				if (action === 'read') {
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						let asset = this.read(ids[i]);
 						if (asset !== null) {
@@ -7406,7 +7689,7 @@ lychee.define('Stash').tags({
 
 					this.bind('#sync', _on_batch_remove, cache);
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						if (this.remove(ids[i]) === false) {
 							result = false;
@@ -7425,7 +7708,7 @@ lychee.define('Stash').tags({
 
 					this.bind('#sync', _on_batch_write, cache);
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						if (this.write(ids[i], assets[i]) === false) {
 							result = false;
@@ -7602,7 +7885,7 @@ lychee.define('Storage').tags({
 	const _PERSISTENT = {
 		data: {},
 		read: function() {
-			return null;
+			return false;
 		},
 		write: function() {
 			return false;
@@ -7611,14 +7894,7 @@ lychee.define('Storage').tags({
 	const _TEMPORARY  = {
 		data: {},
 		read: function() {
-
-			if (Object.keys(this.data).length > 0) {
-				return this.data;
-			}
-
-
-			return null;
-
+			return true;
 		},
 		write: function() {
 			return true;
@@ -8364,7 +8640,19 @@ lychee.define('Viewport').tags({
 		 */
 
 		setFullscreen: function(fullscreen) {
+
+			fullscreen = typeof fullscreen === 'boolean' ? fullscreen : null;
+
+
+			if (fullscreen !== null) {
+
+				// XXX: No fullscreen support
+
+			}
+
+
 			return false;
+
 		}
 
 	};
@@ -8911,7 +9199,9 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				if (connection !== null) {
 
-					protocol = new _Protocol(_Protocol.TYPE.remote);
+					protocol = new _Protocol({
+						type: _Protocol.TYPE.remote
+					});
 
 					connection.allowHalfOpen = true;
 					connection.setTimeout(0);
@@ -8926,7 +9216,9 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				} else {
 
-					protocol   = new _Protocol(_Protocol.TYPE.client);
+					protocol   = new _Protocol({
+						type: _Protocol.TYPE.client
+					});
 					connection = new _net.Socket({
 						readable: true,
 						writable: true
@@ -8948,7 +9240,13 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -8970,12 +9268,18 @@ lychee.define('lychee.net.socket.HTTP').tags({
 					let enc   = binary === true ? 'binary' : 'utf8';
 
 					if (chunk !== null) {
+
 						connection.write(chunk, enc);
+
+						return true;
 					}
 
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -9409,7 +9713,9 @@ lychee.define('lychee.net.socket.WS').tags({
 
 					connection.on('upgrade', function(event) {
 
-						let protocol = new _Protocol(_Protocol.TYPE.remote);
+						let protocol = new _Protocol({
+							type: _Protocol.TYPE.remote
+						});
 						let socket   = event.socket || null;
 
 
@@ -9462,7 +9768,9 @@ lychee.define('lychee.net.socket.WS').tags({
 
 					connector.on('upgrade', function(event) {
 
-						let protocol = new _Protocol(_Protocol.TYPE.client);
+						let protocol = new _Protocol({
+							type: _Protocol.TYPE.client
+						});
 						let socket   = event.socket || null;
 
 
@@ -9543,7 +9851,13 @@ lychee.define('lychee.net.socket.WS').tags({
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -9565,12 +9879,18 @@ lychee.define('lychee.net.socket.WS').tags({
 					let enc   = binary === true ? 'binary' : 'utf8';
 
 					if (chunk !== null) {
+
 						connection.write(chunk, enc);
+
+						return true;
 					}
 
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -9876,7 +10196,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 				return true;
 
-			} else if (/start|stop|edit|file|web/g.test(action) && resource !== '') {
+			} else if (/^(start|stop|edit|file|web)$/g.test(action) && resource !== '') {
 
 				return true;
 
@@ -9896,7 +10216,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 	const _help = function(value) {
 
 		let action = value.split('=')[0];
-		let helper = null;
+		let result = false;
 
 
 		if (action === 'refresh') {
@@ -9916,11 +10236,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 					stderr = (stderr.trim() || '').toString();
 
-					if (error !== null && error.signal !== 'SIGTERM') {
-
-						helper = null;
-
-					} else if (stderr !== '') {
+					if (stderr !== '') {
 
 						if (lychee.debug === true) {
 
@@ -9943,16 +10259,18 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 				helper.on('exit', function(code) {});
 
+				result = true;
+
 			} catch (err) {
 
-				helper = null;
+				result = false;
 
 			}
 
 		}
 
 
-		return helper !== null;
+		return result;
 
 	};
 
@@ -10129,10 +10447,10 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 		setValue: function(value) {
 
-			value = _is_value(value) === true ? value : null;
+			value = typeof value === 'string' ? value : null;
 
 
-			if (value !== null) {
+			if (value !== null && _is_value(value) === true) {
 
 				this.value    = value;
 				this.__action = value.split('=')[0] || null;
@@ -10308,7 +10626,7 @@ lychee.define('lychee.ui.entity.Upload').tags({
 
 (function(lychee, global) {
 
-	let environment = lychee.deserialize({"constructor":"lychee.Environment","arguments":[{"id":"/libraries/fertilizer/dist","build":"fertilizer.Main","debug":false,"sandbox":false,"timeout":5000,"type":"build","tags":{"platform":["node"]}}],"blob":{"definitions":{"fertilizer.Main":{"constructor":"lychee.Definition","arguments":["fertilizer.Main"],"blob":{"attaches":{},"requires":["lychee.Input","lychee.codec.JSON","fertilizer.data.Shell","fertilizer.template.html.Application","fertilizer.template.html.Library","fertilizer.template.html-nwjs.Application","fertilizer.template.html-nwjs.Library","fertilizer.template.html-webview.Application","fertilizer.template.html-webview.Library","fertilizer.template.node.Application","fertilizer.template.node.Library"],"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _lychee   = lychee.import('lychee');\n\tconst _template = lychee.import('fertilizer.template');\n\tconst _Emitter  = lychee.import('lychee.event.Emitter');\n\tconst _Input    = lychee.import('lychee.Input');\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _JSON     = lychee.import('lychee.codec.JSON');\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\tlet _DEFAULTS = {\n\n\t\tproject:    null,\n\t\tidentifier: null,\n\t\tsettings:   null\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(settings) {\n\n\t\tthis.settings = _lychee.assignunlink({}, _DEFAULTS, settings);\n\t\tthis.defaults = _lychee.assignunlink({}, this.settings);\n\n\n\t\t_Emitter.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('load', function() {\n\n\t\t\tlet identifier = this.settings.identifier || null;\n\t\t\tlet project    = this.settings.project    || null;\n\t\t\tlet data       = this.settings.settings   || null;\n\n\t\t\tif (identifier !== null && project !== null && data !== null) {\n\n\t\t\t\tlet platform = data.tags.platform[0] || null;\n\t\t\t\tlet variant  = data.variant || null;\n\t\t\t\tlet settings = _JSON.decode(_JSON.encode(Object.assign({}, data, {\n\t\t\t\t\tdebug:   false,\n\t\t\t\t\tsandbox: true,\n\t\t\t\t\ttimeout: 5000,\n\t\t\t\t\ttype:    'export'\n\t\t\t\t})));\n\n\n\t\t\t\tlet profile = {};\n\t\t\t\tif (settings.profile instanceof Object) {\n\t\t\t\t\tprofile = settings.profile;\n\t\t\t\t}\n\n\n\t\t\t\tif (platform !== null && /application|library/g.test(variant)) {\n\n\t\t\t\t\tif (settings.packages instanceof Array) {\n\n\t\t\t\t\t\tsettings.packages = settings.packages.map(function(pkg) {\n\n\t\t\t\t\t\t\tlet id   = pkg[0];\n\t\t\t\t\t\t\tlet path = pkg[1];\n\t\t\t\t\t\t\tif (path.substr(0, 2) === './') {\n\t\t\t\t\t\t\t\tpath = project + '/' + path.substr(2);\n\t\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\t\treturn [ id, path ];\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tlet that           = this;\n\t\t\t\t\tlet environment    = new _lychee.Environment(settings);\n\t\t\t\t\tlet fertilizer_pkg = environment.packages.filter(function(pkg) {\n\t\t\t\t\t\treturn pkg.id === 'fertilizer';\n\t\t\t\t\t})[0] || null;\n\n\t\t\t\t\tif (fertilizer_pkg !== null) {\n\n\t\t\t\t\t\tfor (let id in _lychee.environment.definitions) {\n\t\t\t\t\t\t\tenvironment.define(_lychee.environment.definitions[id]);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\t_lychee.debug = false;\n\t\t\t\t\t_lychee.setEnvironment(environment);\n\n\n\t\t\t\t\tenvironment.init(function(sandbox) {\n\n\t\t\t\t\t\tif (sandbox !== null) {\n\n\t\t\t\t\t\t\t// IMPORTANT: Don't use Environment's imperative API here!\n\t\t\t\t\t\t\t// Environment identifier is /libraries/lychee/main instead of /libraries/lychee/html/main\n\n\t\t\t\t\t\t\tenvironment.id       = project + '/' + identifier.split('/').pop();\n\t\t\t\t\t\t\tenvironment.type     = 'build';\n\t\t\t\t\t\t\tenvironment.debug    = that.defaults.settings.debug;\n\t\t\t\t\t\t\tenvironment.sandbox  = that.defaults.settings.sandbox;\n\t\t\t\t\t\t\tenvironment.packages = [];\n\n\n\t\t\t\t\t\t\t_lychee.setEnvironment(null);\n\n\n\t\t\t\t\t\t\tthat.trigger('init', [ project, identifier, platform, variant, environment, profile ]);\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"load\" event');\n\n\t\t\t\t\t\t\tif (typeof environment.global.console.serialize === 'function') {\n\n\t\t\t\t\t\t\t\tlet debug = environment.global.console.serialize();\n\t\t\t\t\t\t\t\tif (debug.blob !== null) {\n\n\t\t\t\t\t\t\t\t\t(debug.blob.stderr || '').trim().split('\\n').map(function(line) {\n\t\t\t\t\t\t\t\t\t\treturn (line.indexOf(':') !== -1 ? line.split(':')[1].trim() : '');\n\t\t\t\t\t\t\t\t\t}).forEach(function(line) {\n\t\t\t\t\t\t\t\t\t\tconsole.error('fertilizer: ' + line);\n\t\t\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\t\tthat.destroy(1);\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t});\n\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t} else if (project !== null) {\n\n\t\t\t\tthis.trigger('init', [ project, identifier, null, null ]);\n\n\t\t\t\treturn true;\n\n\t\t\t} else {\n\n\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"load\" event');\n\t\t\t\tthis.destroy(1);\n\n\n\t\t\t\treturn false;\n\n\t\t\t}\n\n\t\t}, this, true);\n\n\t\tthis.bind('init', function(project, identifier, platform, variant, environment, profile) {\n\n\t\t\tlet construct = null;\n\t\t\tif (platform !== null && variant !== null && typeof _template[platform] === 'object') {\n\t\t\t\tconstruct = _template[platform][variant.charAt(0).toUpperCase() + variant.substr(1).toLowerCase()] || null;\n\t\t\t} else {\n\t\t\t\tconstruct = _Template;\n\t\t\t}\n\n\n\t\t\tif (construct !== null) {\n\n\t\t\t\tlychee.ROOT.project                           = _lychee.ROOT.lychee + project;\n\t\t\t\tlychee.environment.global.lychee.ROOT.project = _lychee.ROOT.lychee + project;\n\n\n\t\t\t\tlet template = new construct({});\n\t\t\t\tif (template instanceof _Template) {\n\n\t\t\t\t\t// XXX: Third-party project\n\n\t\t\t\t\ttemplate.setSandbox(project + '/build');\n\n\t\t\t\t\ttemplate.then('configure-project');\n\t\t\t\t\ttemplate.then('build-project');\n\t\t\t\t\ttemplate.then('package-project');\n\n\t\t\t\t} else {\n\n\t\t\t\t\t// XXX: lychee.js project\n\n\t\t\t\t\ttemplate.setEnvironment(environment);\n\t\t\t\t\ttemplate.setProfile(profile);\n\t\t\t\t\ttemplate.setSandbox(project + '/build/' + identifier);\n\n\t\t\t\t\ttemplate.then('configure');\n\t\t\t\t\ttemplate.then('configure-project');\n\t\t\t\t\ttemplate.then('build');\n\t\t\t\t\ttemplate.then('build-project');\n\t\t\t\t\ttemplate.then('package');\n\t\t\t\t\ttemplate.then('package-project');\n\n\t\t\t\t}\n\n\n\t\t\t\ttemplate.bind('configure-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/configure.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\t\tconsole.info('fertilizer: CONFIGURE-PROJECT SUCCESS');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tconsole.warn('fertilizer: CONFIGURE-PROJECT FAILURE');\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\t\t\t\ttemplate.bind('build-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/build.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\t\tconsole.info('fertilizer: BUILD-PROJECT SUCCESS');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tconsole.warn('fertilizer: BUILD-PROJECT FAILURE');\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\t\t\t\ttemplate.bind('package-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/package.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\t\tconsole.info('fertilizer: PACKAGE-PROJECT SUCCESS');\n\t\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tconsole.warn('fertilizer: PACKAGE-PROJECT FAILURE');\n\t\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\n\t\t\t\ttemplate.bind('complete', function() {\n\n\t\t\t\t\tconsole.info('fertilizer: SUCCESS (\"' + project + ' | ' + identifier + '\")');\n\t\t\t\t\tthis.destroy(0);\n\n\t\t\t\t}, this);\n\n\t\t\t\ttemplate.bind('error', function(event) {\n\n\t\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"' + event + '\" event');\n\t\t\t\t\tthis.destroy(1);\n\n\t\t\t\t}, this);\n\n\n\t\t\t\ttemplate.init();\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"init\" event');\n\t\t\tthis.destroy(1);\n\n\n\t\t\treturn false;\n\n\t\t}, this, true);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.Main';\n\n\n\t\t\tlet settings = _lychee.assignunlink({}, this.settings);\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * MAIN API\n\t\t */\n\n\t\tinit: function() {\n\n\t\t\tthis.trigger('load');\n\n\t\t},\n\n\t\tdestroy: function(code) {\n\n\t\t\tcode = typeof code === 'number' ? code : 0;\n\n\n\t\t\tthis.trigger('destroy', [ code ]);\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Emitter":{"constructor":"lychee.Definition","arguments":["lychee.event.Emitter"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _bind = function(event, callback, scope, once) {\n\n\t\tif (event === null || callback === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet pass_event = false;\n\t\tlet pass_self  = false;\n\n\t\tlet modifier = event.charAt(0);\n\t\tif (modifier === '@') {\n\n\t\t\tevent      = event.substr(1, event.length - 1);\n\t\t\tpass_event = true;\n\n\t\t} else if (modifier === '#') {\n\n\t\t\tevent     = event.substr(1, event.length - 1);\n\t\t\tpass_self = true;\n\n\t\t}\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: pass_event,\n\t\t\tpass_self:  pass_self,\n\t\t\tcallback:   callback,\n\t\t\tscope:      scope,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _relay = function(event, instance, once) {\n\n\t\tif (event === null || instance === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet callback = function() {\n\n\t\t\tlet event = arguments[0];\n\t\t\tlet data  = [];\n\n\t\t\tfor (let a = 1, al = arguments.length; a < al; a++) {\n\t\t\t\tdata.push(arguments[a]);\n\t\t\t}\n\n\t\t\tthis.trigger(event, data);\n\n\t\t};\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: true,\n\t\t\tpass_self:  false,\n\t\t\tcallback:   callback,\n\t\t\tscope:      instance,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _trigger = function(event, data) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet value = undefined;\n\n\t\t\tfor (let e = 0; e < this.___events[event].length; e++) {\n\n\t\t\t\tlet args  = [];\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif (entry.pass_event === true) {\n\n\t\t\t\t\targs.push(event);\n\n\t\t\t\t} else if (entry.pass_self === true) {\n\n\t\t\t\t\targs.push(this);\n\n\t\t\t\t}\n\n\n\t\t\t\tif (data !== null) {\n\t\t\t\t\targs.push.apply(args, data);\n\t\t\t\t}\n\n\n\t\t\t\tlet result = entry.callback.apply(entry.scope, args);\n\t\t\t\tif (result !== undefined) {\n\t\t\t\t\tvalue = result;\n\t\t\t\t}\n\n\n\t\t\t\tif (entry.once === true) {\n\n\t\t\t\t\tif (this.unbind(event, entry.callback, entry.scope) === true) {\n\t\t\t\t\t\te--;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (value !== undefined) {\n\t\t\t\treturn value;\n\t\t\t} else {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _unbind = function(event, callback, scope) {\n\n\t\tlet found = false;\n\n\t\tif (event !== null) {\n\n\t\t\tfound = _unbind_event.call(this, event, callback, scope);\n\n\t\t} else {\n\n\t\t\tfor (event in this.___events) {\n\n\t\t\t\tlet result = _unbind_event.call(this, event, callback, scope);\n\t\t\t\tif (result === true) {\n\t\t\t\t\tfound = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn found;\n\n\t};\n\n\tconst _unbind_event = function(event, callback, scope) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif ((callback === null || entry.callback === callback) && (scope === null || entry.scope === scope)) {\n\n\t\t\t\t\tfound = true;\n\n\t\t\t\t\tthis.___events[event].splice(e, 1);\n\t\t\t\t\tel--;\n\t\t\t\t\te--;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn found;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___events   = {};\n\t\tthis.___timeline = {\n\t\t\tbind:    [],\n\t\t\ttrigger: [],\n\t\t\trelay:   [],\n\t\t\tunbind:  []\n\t\t};\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.events instanceof Object) {\n\t\t\t\t// TODO: deserialize events\n\t\t\t}\n\n\t\t\tif (blob.timeline instanceof Object) {\n\t\t\t\t// TODO: deserialize timeline\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (Object.keys(this.___events).length > 0) {\n\n\t\t\t\tblob.events = {};\n\n\t\t\t\tfor (let event in this.___events) {\n\n\t\t\t\t\tblob.events[event] = [];\n\n\t\t\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\t\t\tblob.events[event].push({\n\t\t\t\t\t\t\tpass_event: entry.pass_event,\n\t\t\t\t\t\t\tpass_self:  entry.pass_self,\n\t\t\t\t\t\t\tcallback:   lychee.serialize(entry.callback),\n\t\t\t\t\t\t\t// scope:      lychee.serialize(entry.scope),\n\t\t\t\t\t\t\tscope:      null,\n\t\t\t\t\t\t\tonce:       entry.once\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (this.___timeline.bind.length > 0 || this.___timeline.trigger.length > 0 || this.___timeline.unbind.length > 0) {\n\n\t\t\t\tblob.timeline = {};\n\n\n\t\t\t\tif (this.___timeline.bind.length > 0) {\n\n\t\t\t\t\tblob.timeline.bind = [];\n\n\t\t\t\t\tfor (let b = 0, bl = this.___timeline.bind.length; b < bl; b++) {\n\t\t\t\t\t\tblob.timeline.bind.push(this.___timeline.bind[b]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.trigger.length > 0) {\n\n\t\t\t\t\tblob.timeline.trigger = [];\n\n\t\t\t\t\tfor (let t = 0, tl = this.___timeline.trigger.length; t < tl; t++) {\n\t\t\t\t\t\tblob.timeline.trigger.push(this.___timeline.trigger[t]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.unbind.length > 0) {\n\n\t\t\t\t\tblob.timeline.unbind = [];\n\n\t\t\t\t\tfor (let u = 0, ul = this.___timeline.unbind.length; u < ul; u++) {\n\t\t\t\t\t\tblob.timeline.unbind.push(this.___timeline.unbind[u]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'lychee.event.Emitter',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbind: function(event, callback, scope, once) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _bind.call(this, event, callback, scope, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.bind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope),\n\t\t\t\t\tscope:    null,\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\trelay: function(event, instance, once) {\n\n\t\t\tevent    = typeof event === 'string'               ? event    : null;\n\t\t\tinstance = lychee.interfaceof(Composite, instance) ? instance : null;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _relay.call(this, event, instance, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.relay.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tinstance: lychee.serialize(instance),\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\ttrigger: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tlet result = _trigger.call(this, event, data);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.trigger.push({\n\t\t\t\t\ttime:  Date.now(),\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  lychee.serialize(data)\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tunbind: function(event, callback, scope) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : null;\n\n\n\t\t\tlet result = _unbind.call(this, event, callback, scope);\n\t\t\tif (result === true) {\n\n\t\t\t\tthis.___timeline.unbind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope)\n\t\t\t\t\tscope:    null\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Input":{"constructor":"lychee.Definition","arguments":["lychee.Input"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (\n\t\ttypeof global.process !== 'undefined'\n\t\t&& typeof global.process.stdin === 'object'\n\t\t&& typeof global.process.stdin.on === 'function'\n\t) {\n\t\treturn true;\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _process   = global.process;\n\tconst _Emitter   = lychee.import('lychee.event.Emitter');\n\tconst _INSTANCES = [];\n\n\n\n\t/*\n\t * EVENTS\n\t */\n\n\tconst _listeners = {\n\n\t\tkeypress: function(key) {\n\n\t\t\t// TTY conform behaviour\n\t\t\tif (key.ctrl === true && key.name === 'c') {\n\n\t\t\t\tkey.name  = 'escape';\n\t\t\t\tkey.ctrl  = false;\n\t\t\t\tkey.alt   = false;\n\t\t\t\tkey.shift = false;\n\n\t\t\t}\n\n\n\t\t\tfor (let i = 0, l = _INSTANCES.length; i < l; i++) {\n\t\t\t\t_process_key.call(_INSTANCES[i], key.name, key.ctrl, key.meta, key.shift);\n\t\t\t}\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tlet keypress = true;\n\t\tif (keypress === true) {\n\t\t\t_process.stdin.on('keypress', _listeners.keypress);\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (keypress) methods.push('Keyboard');\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Input: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Input: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_key = function(key, ctrl, alt, shift) {\n\n\t\tif (this.key === false) {\n\n\t\t\treturn false;\n\n\t\t} else if (this.keymodifier === false) {\n\n\t\t\tif (key === 'ctrl' || key === 'meta' || key === 'shift') {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\tlet name    = '';\n\t\tlet handled = false;\n\t\tlet delta   = Date.now() - this.__clock.key;\n\n\t\tif (delta < this.delay) {\n\t\t\treturn true;\n\t\t} else {\n\t\t\tthis.__clock.key = Date.now();\n\t\t}\n\n\n\t\t// 0. Computation: Normal Characters\n\t\tif (ctrl  === true) name += 'ctrl-';\n\t\tif (alt   === true) name += 'alt-';\n\t\tif (shift === true) name += 'shift-';\n\n\t\tname += key.toLowerCase();\n\n\n\t\t// 1. Event API\n\t\tif (key !== null) {\n\n\t\t\t// allow bind('key') and bind('ctrl-a');\n\n\t\t\thandled = this.trigger('key', [ key, name, delta ]) || handled;\n\t\t\thandled = this.trigger(name,  [ delta ])            || handled;\n\n\t\t}\n\n\n\t\treturn handled;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.delay       = 0;\n\t\tthis.key         = false;\n\t\tthis.keymodifier = false;\n\t\tthis.touch       = false;\n\t\tthis.swipe       = false;\n\n\t\tthis.__clock  = {\n\t\t\tkey:   Date.now(),\n\t\t\ttouch: Date.now(),\n\t\t\tswipe: Date.now()\n\t\t};\n\n\n\t\tthis.setDelay(settings.delay);\n\t\tthis.setKey(settings.key);\n\t\tthis.setKeyModifier(settings.keymodifier);\n\t\tthis.setTouch(settings.touch);\n\t\tthis.setSwipe(settings.swipe);\n\n\n\t\t_Emitter.call(this);\n\n\t\t_INSTANCES.push(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\tdestroy: function() {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let i = 0, il = _INSTANCES.length; i < il; i++) {\n\n\t\t\t\tif (_INSTANCES[i] === this) {\n\t\t\t\t\t_INSTANCES.splice(i, 1);\n\t\t\t\t\tfound = true;\n\t\t\t\t\til--;\n\t\t\t\t\ti--;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tthis.unbind();\n\n\n\t\t\treturn found;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Input';\n\n\t\t\tlet settings = {};\n\n\n\t\t\tif (this.delay !== 0)           settings.delay       = this.delay;\n\t\t\tif (this.key !== false)         settings.key         = this.key;\n\t\t\tif (this.keymodifier !== false) settings.keymodifier = this.keymodifier;\n\t\t\tif (this.touch !== false)       settings.touch       = this.touch;\n\t\t\tif (this.swipe !== false)       settings.swipe       = this.swipe;\n\n\n\t\t\tdata['arguments'][0] = settings;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetDelay: function(delay) {\n\n\t\t\tdelay = typeof delay === 'number' ? delay : null;\n\n\n\t\t\tif (delay !== null) {\n\n\t\t\t\tthis.delay = delay;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKey: function(key) {\n\n\t\t\tif (key === true || key === false) {\n\n\t\t\t\tthis.key = key;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKeyModifier: function(keymodifier) {\n\n\t\t\tif (keymodifier === true || keymodifier === false) {\n\n\t\t\t\tthis.keymodifier = keymodifier;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetTouch: function(touch) {\n\n\t\t\tif (touch === true || touch === false) {\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSwipe: function(swipe) {\n\n\t\t\tif (swipe === true || swipe === false) {\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.codec.JSON":{"constructor":"lychee.Definition","arguments":["lychee.codec.JSON"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _CHARS_DANGEROUS = /[\\u0000\\u00ad\\u0600-\\u0604\\u070f\\u17b4\\u17b5\\u200c-\\u200f\\u2028-\\u202f\\u2060-\\u206f\\ufeff\\ufff0-\\uffff]/g;\n\tconst _CHARS_ESCAPABLE = /[\\\\\\\"\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u0600-\\u0604\\u070f\\u17b4\\u17b5\\u200c-\\u200f\\u2028-\\u202f\\u2060-\\u206f\\ufeff\\ufff0-\\uffff]/g;\n\tconst _CHARS_META      = {\n\t\t'\\b': '\\\\b',\n\t\t'\\t': '\\\\t',\n\t\t'\\n': '\\\\n',\n\t\t'\\f': '\\\\f',\n\t\t'\\r': '',    // FUCK YOU, Microsoft!\n\t\t'\"':  '\\\\\"',\n\t\t'\\\\': '\\\\\\\\'\n\t};\n\n\tconst _sanitize_string = function(str) {\n\n\t\tlet san = str;\n\n\n\t\tif (_CHARS_ESCAPABLE.test(san)) {\n\n\t\t\tsan = san.replace(_CHARS_ESCAPABLE, function(char) {\n\n\t\t\t\tlet val = _CHARS_META[char];\n\t\t\t\tif (typeof val === 'string') {\n\t\t\t\t\treturn val;\n\t\t\t\t} else {\n\t\t\t\t\treturn '\\\\u' + (char.charCodeAt(0).toString(16)).slice(-4);\n\t\t\t\t}\n\n\t\t\t});\n\n\t\t}\n\n\t\treturn san;\n\n\t};\n\n\n\n\tconst _Stream = function(buffer, mode) {\n\n\t\tthis.__buffer = typeof buffer === 'string'        ? buffer : '';\n\t\tthis.__mode   = lychee.enumof(_Stream.MODE, mode) ? mode   : 0;\n\n\t\tthis.__index  = 0;\n\n\t};\n\n\n\t_Stream.MODE = {\n\t\tread:  0,\n\t\twrite: 1\n\t};\n\n\n\t_Stream.prototype = {\n\n\t\ttoString: function() {\n\t\t\treturn this.__buffer;\n\t\t},\n\n\t\tpointer: function() {\n\t\t\treturn this.__index;\n\t\t},\n\n\t\tlength: function() {\n\t\t\treturn this.__buffer.length;\n\t\t},\n\n\t\tread: function(bytes) {\n\n\t\t\tlet buffer = '';\n\n\t\t\tbuffer       += this.__buffer.substr(this.__index, bytes);\n\t\t\tthis.__index += bytes;\n\n\t\t\treturn buffer;\n\n\t\t},\n\n\t\tsearch: function(array) {\n\n\t\t\tlet bytes = Infinity;\n\n\t\t\tfor (let a = 0, al = array.length; a < al; a++) {\n\n\t\t\t\tlet token = array[a];\n\t\t\t\tlet size  = this.__buffer.indexOf(token, this.__index + 1) - this.__index;\n\t\t\t\tif (size > -1 && size < bytes) {\n\t\t\t\t\tbytes = size;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (bytes === Infinity) {\n\t\t\t\treturn 0;\n\t\t\t}\n\n\n\t\t\treturn bytes;\n\n\t\t},\n\n\t\tseek: function(bytes) {\n\t\t\treturn this.__buffer.substr(this.__index, bytes);\n\t\t},\n\n\t\twrite: function(buffer) {\n\n\t\t\tthis.__buffer += buffer;\n\t\t\tthis.__index  += buffer.length;\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * ENCODER and DECODER\n\t */\n\n\tconst _encode = function(stream, data) {\n\n\t\t// null,false,true: Boolean or Null or EOS\n\t\tif (typeof data === 'boolean' || data === null) {\n\n\t\t\tif (data === null) {\n\t\t\t\tstream.write('null');\n\t\t\t} else if (data === false) {\n\t\t\t\tstream.write('false');\n\t\t\t} else if (data === true) {\n\t\t\t\tstream.write('true');\n\t\t\t}\n\n\n\t\t// 123,12.3: Integer or Float\n\t\t} else if (typeof data === 'number') {\n\n\t\t\tlet type = 1;\n\t\t\tif (data < 268435456 && data !== (data | 0)) {\n\t\t\t\ttype = 2;\n\t\t\t}\n\n\n\t\t\t// Negative value\n\t\t\tlet sign = 0;\n\t\t\tif (data < 0) {\n\t\t\t\tdata = -data;\n\t\t\t\tsign = 1;\n\t\t\t}\n\n\n\t\t\tif (sign === 1) {\n\t\t\t\tstream.write('-');\n\t\t\t}\n\n\n\t\t\tif (type === 1) {\n\t\t\t\tstream.write('' + data.toString());\n\t\t\t} else {\n\t\t\t\tstream.write('' + data.toString());\n\t\t\t}\n\n\n\t\t// \"\": String\n\t\t} else if (typeof data === 'string') {\n\n\t\t\tdata = _sanitize_string(data);\n\n\n\t\t\tstream.write('\"');\n\n\t\t\tstream.write(data);\n\n\t\t\tstream.write('\"');\n\n\n\t\t// []: Array\n\t\t} else if (data instanceof Array) {\n\n\t\t\tstream.write('[');\n\n\t\t\tfor (let d = 0, dl = data.length; d < dl; d++) {\n\n\t\t\t\t_encode(stream, data[d]);\n\n\t\t\t\tif (d < dl - 1) {\n\t\t\t\t\tstream.write(',');\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tstream.write(']');\n\n\n\t\t// {}: Object\n\t\t} else if (data instanceof Object && typeof data.serialize !== 'function') {\n\n\t\t\tstream.write('{');\n\n\t\t\tlet keys = Object.keys(data);\n\n\t\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\t\tlet key = keys[k];\n\n\t\t\t\t_encode(stream, key);\n\t\t\t\tstream.write(':');\n\n\t\t\t\t_encode(stream, data[key]);\n\n\t\t\t\tif (k < kl - 1) {\n\t\t\t\t\tstream.write(',');\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tstream.write('}');\n\n\n\t\t// Custom High-Level Implementation\n\t\t} else if (data instanceof Object && typeof data.serialize === 'function') {\n\n\t\t\tstream.write('%');\n\n\t\t\tlet blob = lychee.serialize(data);\n\n\t\t\t_encode(stream, blob);\n\n\t\t\tstream.write('%');\n\n\t\t}\n\n\t};\n\n\tconst _decode = function(stream) {\n\n\t\tlet value  = undefined;\n\t\tlet seek   = '';\n\t\tlet size   = 0;\n\t\tlet tmp    = 0;\n\t\tlet errors = 0;\n\t\tlet check  = null;\n\n\n\t\tif (stream.pointer() < stream.length()) {\n\n\t\t\tseek = stream.seek(1);\n\n\n\t\t\t// null,false,true: Boolean or Null or EOS\n\t\t\tif (seek === 'n' || seek === 'f' || seek === 't') {\n\n\t\t\t\tif (stream.seek(4) === 'null') {\n\t\t\t\t\tstream.read(4);\n\t\t\t\t\tvalue = null;\n\t\t\t\t} else if (stream.seek(5) === 'false') {\n\t\t\t\t\tstream.read(5);\n\t\t\t\t\tvalue = false;\n\t\t\t\t} else if (stream.seek(4) === 'true') {\n\t\t\t\t\tstream.read(4);\n\t\t\t\t\tvalue = true;\n\t\t\t\t}\n\n\n\t\t\t// 123: Number\n\t\t\t} else if (seek === '-' || !isNaN(parseInt(seek, 10))) {\n\n\t\t\t\tsize = stream.search([ ',', ']', '}' ]);\n\n\t\t\t\tif (size > 0) {\n\n\t\t\t\t\ttmp = stream.read(size);\n\n\t\t\t\t\tif (tmp.indexOf('.') !== -1) {\n\t\t\t\t\t\tvalue = parseFloat(tmp, 10);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tvalue = parseInt(tmp, 10);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t// \"\": String\n\t\t\t} else if (seek === '\"') {\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\tsize = stream.search([ '\\\\', '\"' ]);\n\n\t\t\t\tif (size > 0) {\n\t\t\t\t\tvalue = stream.read(size);\n\t\t\t\t} else {\n\t\t\t\t\tvalue = '';\n\t\t\t\t}\n\n\n\t\t\t\tcheck = stream.read(1);\n\n\n\t\t\t\twhile (check === '\\\\') {\n\n\t\t\t\t\tvalue[value.length - 1] = check;\n\n\t\t\t\t\tlet special = stream.seek(1);\n\t\t\t\t\tif (special === 'b') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\\b';\n\n\t\t\t\t\t} else if (special === 't') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\\t';\n\n\t\t\t\t\t} else if (special === 'n') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\\n';\n\n\t\t\t\t\t} else if (special === 'f') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\\f';\n\n\t\t\t\t\t} else if (special === '\"') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\"';\n\n\t\t\t\t\t} else if (special === '\\\\') {\n\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\tvalue += '\\\\';\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tsize   = stream.search([ '\\\\', '\"' ]);\n\t\t\t\t\tvalue += stream.read(size);\n\t\t\t\t\tcheck  = stream.read(1);\n\n\t\t\t\t}\n\n\n\t\t\t// []: Array\n\t\t\t} else if (seek === '[') {\n\n\t\t\t\tvalue = [];\n\n\n\t\t\t\tsize  = stream.search([ ']' ]);\n\t\t\t\tcheck = stream.read(1).trim() + stream.seek(size).trim();\n\n\t\t\t\tif (check !== '[]') {\n\n\t\t\t\t\twhile (errors === 0) {\n\n\t\t\t\t\t\tvalue.push(_decode(stream));\n\n\t\t\t\t\t\tcheck = stream.seek(1);\n\n\t\t\t\t\t\tif (check === ',') {\n\t\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\t} else if (check === ']') {\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\terrors++;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tstream.read(1);\n\n\t\t\t\t} else {\n\n\t\t\t\t\tstream.read(size);\n\n\t\t\t\t}\n\n\n\t\t\t// {}: Object\n\t\t\t} else if (seek === '{') {\n\n\t\t\t\tvalue = {};\n\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\twhile (errors === 0) {\n\n\t\t\t\t\tif (stream.seek(1) === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\n\n\t\t\t\t\tlet object_key = _decode(stream);\n\t\t\t\t\tcheck = stream.seek(1);\n\n\t\t\t\t\tif (check === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t} else if (check === ':') {\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t} else if (check !== ':') {\n\t\t\t\t\t\terrors++;\n\t\t\t\t\t}\n\n\t\t\t\t\tlet object_value = _decode(stream);\n\t\t\t\t\tcheck = stream.seek(1);\n\n\n\t\t\t\t\tvalue[object_key] = object_value;\n\n\n\t\t\t\t\tif (check === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t} else if (check === ',') {\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t} else {\n\t\t\t\t\t\terrors++;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tstream.read(1);\n\n\t\t\t// %%: Custom High-Level Implementation\n\t\t\t} else if (seek === '%') {\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\tlet blob = _decode(stream);\n\n\t\t\t\tvalue = lychee.deserialize(blob);\n\t\t\t\tcheck = stream.read(1);\n\n\t\t\t\tif (check !== '%') {\n\t\t\t\t\tvalue = undefined;\n\t\t\t\t}\n\n\t\t\t} else {\n\n\t\t\t\t// Invalid seek, assume it's a space character\n\n\t\t\t\tstream.read(1);\n\t\t\t\treturn _decode(stream);\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn value;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tconst Module = {\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\treturn {\n\t\t\t\t'reference': 'lychee.codec.JSON',\n\t\t\t\t'blob':      null\n\t\t\t};\n\n\t\t},\n\n\t\tencode: function(data) {\n\n\t\t\tdata = data instanceof Object ? data : null;\n\n\n\t\t\tif (data !== null) {\n\n\t\t\t\tlet stream = new _Stream('', _Stream.MODE.write);\n\n\t\t\t\t_encode(stream, data);\n\n\t\t\t\treturn new Buffer(stream.toString(), 'utf8');\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tdecode: function(data) {\n\n\t\t\tdata = data instanceof Buffer ? data : null;\n\n\n\t\t\tif (data !== null) {\n\n\t\t\t\tlet stream = new _Stream(data.toString('utf8'), _Stream.MODE.read);\n\t\t\t\tlet object = _decode(stream);\n\t\t\t\tif (object !== undefined) {\n\t\t\t\t\treturn object;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t}\n\n\t};\n\n\n\treturn Module;\n\n}"}},"fertilizer.data.Shell":{"constructor":"lychee.Definition","arguments":["fertilizer.data.Shell"],"blob":{"attaches":{},"tags":{"platform":"node"},"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('child_process');\n\t\t\tglobal.require('path');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _child_process = require('child_process');\n\tconst _ROOT          = lychee.ROOT.lychee;\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.__stack = [];\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.stack instanceof Array) {\n\n\t\t\t\tfor (let s = 0, sl = blob.stack.length; s < sl; s++) {\n\t\t\t\t\tthis.__stack.push(blob.stack[s]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (this.__stack.length > 0) {\n\t\t\t\tblob.stack = this.__stack.map(lychee.serialize);\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'fertilizer.data.Shell',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\texec: function(command, callback, scope) {\n\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\n\n\t\t\tlet that = this;\n\t\t\tlet args = command.split(' ').slice(1);\n\t\t\tlet cmd  = command.split(' ')[0];\n\t\t\tlet file = _ROOT + (cmd.charAt(0) !== '/' ? '/' : '') + cmd;\n\t\t\tlet ext  = file.split('.').pop();\n\t\t\tlet path = file.split('/').slice(0, -1).join('/');\n\t\t\tif (path.split('/').pop() === 'bin') {\n\t\t\t\tpath = path.split('/').slice(0, -1).join('/');\n\t\t\t}\n\n\n\t\t\tif (ext === 'js') {\n\n\t\t\t\targs.reverse();\n\t\t\t\targs.push(file);\n\t\t\t\targs.push('env:node');\n\t\t\t\targs.reverse();\n\n\t\t\t\tfile = _ROOT + '/bin/helper.sh';\n\n\t\t\t}\n\n\n\t\t\tif (callback !== null) {\n\n\t\t\t\ttry {\n\n\t\t\t\t\t_child_process.execFile(file, args, {\n\t\t\t\t\t\tcwd: path\n\t\t\t\t\t}, function(error, stdout, stderr) {\n\n\t\t\t\t\t\tthat.__stack.push({\n\t\t\t\t\t\t\targs:   args,\n\t\t\t\t\t\t\tfile:   file,\n\t\t\t\t\t\t\tpath:   path,\n\t\t\t\t\t\t\tstdout: stdout.toString(),\n\t\t\t\t\t\t\tstderr: stderr.toString()\n\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\tif (error) {\n\t\t\t\t\t\t\tcallback.call(scope, false);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tcallback.call(scope, true);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t});\n\n\t\t\t\t} catch (err) {\n\n\t\t\t\t\tcallback.call(scope, false);\n\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\ttrace: function(limit) {\n\n\t\t\tlimit = typeof limit === 'number' ? (limit | 0) : null;\n\n\n\t\t\tlet stack = this.__stack;\n\t\t\tif (limit !== null) {\n\t\t\t\tstack = stack.slice(stack.length - limit, limit);\n\t\t\t}\n\n\n\t\t\tstack.forEach(function(context) {\n\n\t\t\t\tlet dir = context.path;\n\t\t\t\tlet cmd = context.file;\n\t\t\t\tlet out = context.stdout.trim();\n\t\t\t\tlet err = context.stderr.trim();\n\n\t\t\t\tif (cmd.substr(0, dir.length) === dir) {\n\t\t\t\t\tcmd = '.' + cmd.substr(dir.length);\n\t\t\t\t}\n\n\t\t\t\tif (context.args.length > 0) {\n\t\t\t\t\tcmd += ' ';\n\t\t\t\t\tcmd += context.args.join(' ');\n\t\t\t\t}\n\n\t\t\t\tconsole.log('');\n\t\t\t\tconsole.log('cd ' + dir + ';');\n\t\t\t\tconsole.log(cmd + ';');\n\t\t\t\tconsole.log('');\n\n\t\t\t\tif (out.length > 0) {\n\t\t\t\t\tconsole.log(out);\n\t\t\t\t}\n\n\t\t\t\tif (err.length > 0) {\n\t\t\t\t\tconsole.error(err);\n\t\t\t\t}\n\n\t\t\t\tconsole.log('');\n\n\t\t\t});\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html.Application"],"blob":{"attaches":{"appcache.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.appcache.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Q0FDSEUgTUFOSUZFU1QKCkNBQ0hFOgovZmF2aWNvbi5pY28KY29yZS5qcwppY29uLnBuZwppbmRleC5odG1sCm1hbmlmZXN0Lmpzb24KCk5FVFdPUks6Ci9hcGkKaHR0cDovL2hhcnZlc3Rlci5hcnRpZmljaWFsLmVuZ2luZWVyaW5nOjQ4NDgKaHR0cDovL2xvY2FsaG9zdDo0ODQ4Cgo="}},"config.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.config.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,ewoJInNob3J0X25hbWUiOiAgIiR7aWR9IiwKCSJuYW1lIjogICAgICAgICIke2lkfSAocG93ZXJlZCBieSBseWNoZWUuanMpIiwKCSJ2ZXJzaW9uIjogICAgICIke3ZlcnNpb259IiwKCSJkaXNwbGF5IjogICAgICJzdGFuZGFsb25lIiwKCSJvcmllbnRhdGlvbiI6ICJsYW5kc2NhcGUiLAoJImljb25zIjogW3sKCQkic3JjIjogICAiaWNvbi5wbmciLAoJCSJzaXplcyI6ICIxMjh4MTI4IiwKCQkidHlwZSI6ICAiaW1hZ2UvcG5nIgoJfV0sCgkic3RhcnRfdXJsIjogICAgICAgICJpbmRleC5odG1sIiwKCSJ0aGVtZV9jb2xvciI6ICAgICAgIiMyZjM3MzYiLAoJImJhY2tncm91bmRfY29sb3IiOiAiIzQwNTA1MCIKfQoK"}},"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIG1hbmlmZXN0PSJpbmRleC5hcHBjYWNoZSI+CjxoZWFkPgoJPG1ldGEgY2hhcnNldD0idXRmLTgiPgoJPHRpdGxlPiR7aWR9PC90aXRsZT4KCgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+Cgk8bGluayByZWw9Im1hbmlmZXN0IiBocmVmPSIuL21hbmlmZXN0Lmpzb24iPgoJPGxpbmsgcmVsPSJpY29uIiBocmVmPSIuL2ljb24ucG5nIiBzaXplcz0iMTI4eDEyOCIgdHlwZT0iaW1hZ2UvcG5nIj4KCgk8c2NyaXB0IHNyYz0iLi9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlci1jYW52YXMgewoJCQlkaXNwbGF5OiBibG9jazsKCQkJbWFyZ2luOiAwIGF1dG87CgkJCXVzZXItc2VsZWN0OiBub25lOwoJCQktbW96LXVzZXItc2VsZWN0OiBub25lOwoJCQktbXMtdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS13ZWJraXQtdXNlci1zZWxlY3Q6IG5vbmU7CgkJfSAKCTwvc3R5bGU+Cgo8L2hlYWQ+Cjxib2R5Pgo8c2NyaXB0PgooZnVuY3Rpb24obHljaGVlLCBnbG9iYWwpIHsKCglsZXQgZW52aXJvbm1lbnQgPSBseWNoZWUuZGVzZXJpYWxpemUoJHtibG9ifSk7CglpZiAoZW52aXJvbm1lbnQgIT09IG51bGwpIHsKCQlseWNoZWUuZW52aW5pdChlbnZpcm9ubWVudCwgJHtwcm9maWxlfSk7Cgl9Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4K"}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tconfig:   attachments[\"config.tpl\"],\n\t\tappcache: attachments[\"appcache.tpl\"],\n\t\tcore:     null,\n\t\ticon:     attachments[\"icon.png\"],\n\t\tindex:    attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__appcache = lychee.deserialize(lychee.serialize(_TEMPLATES.appcache));\n\t\tthis.__config   = lychee.deserialize(lychee.serialize(_TEMPLATES.config));\n\t\tthis.__core     = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon     = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index    = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\n\t\t\tlet that   = this;\n\t\t\tlet load   = 3;\n\t\t\tlet config = this.stash.read('./manifest.json');\n\t\t\tlet core   = this.stash.read('/libraries/lychee/build/html/core.js');\n\t\t\tlet icon   = this.stash.read('./icon.png');\n\n\t\t\tif (config !== null) {\n\n\t\t\t\tconfig.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__config = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tconfig.load();\n\n\t\t\t}\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (config === null && core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox  = this.sandbox;\n\t\t\t\tlet appcache = this.__appcache;\n\t\t\t\tlet config   = this.__config;\n\t\t\t\tlet core     = this.__core;\n\t\t\t\tlet icon     = this.__icon;\n\t\t\t\tlet index    = this.__index;\n\n\n\t\t\t\tif (!(config instanceof Config)) {\n\n\t\t\t\t\tconfig        = new Config();\n\t\t\t\t\tconfig.buffer = JSON.parse(_TEMPLATES.config.buffer.replaceObject({\n\t\t\t\t\t\tdebug:   env.debug,\n\t\t\t\t\t\tid:      env.id,\n\t\t\t\t\t\tversion: lychee.VERSION\n\t\t\t\t\t}));\n\n\t\t\t\t}\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/manifest.json',  config);\n\t\t\t\tstash.write(sandbox + '/core.js',        core);\n\t\t\t\tstash.write(sandbox + '/icon.png',       icon);\n\t\t\t\tstash.write(sandbox + '/index.appcache', appcache);\n\t\t\t\tstash.write(sandbox + '/index.html',     index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.Template":{"constructor":"lychee.Definition","arguments":["fertilizer.Template"],"blob":{"attaches":{},"requires":["lychee.Stash","fertilizer.data.Shell"],"includes":["lychee.event.Flow"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Flow  = lychee.import('lychee.event.Flow');\n\tconst _Stash = lychee.import('lychee.Stash');\n\tconst _Shell = lychee.import('fertilizer.data.Shell');\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.environment = null;\n\t\tthis.sandbox     = '';\n\t\tthis.settings    = {};\n\t\tthis.profile     = null;\n\t\tthis.shell       = new _Shell();\n\t\tthis.stash       = new _Stash({\n\t\t\ttype: _Stash.TYPE.persistent\n\t\t});\n\n\n\t\tthis.setEnvironment(settings.environment);\n\t\tthis.setProfile(settings.profile);\n\t\tthis.setSandbox(settings.sandbox);\n\t\tthis.setSettings(settings.settings);\n\n\n\t\t_Flow.call(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tlet environment = lychee.deserialize(blob.environment);\n\t\t\tlet shell       = lychee.deserialize(blob.shell);\n\t\t\tlet stash       = lychee.deserialize(blob.stash);\n\n\t\t\tif (environment !== null) {\n\t\t\t\tthis.setEnvironment(environment);\n\t\t\t}\n\n\t\t\tif (shell !== null) {\n\t\t\t\tthis.shell = shell;\n\t\t\t}\n\n\t\t\tif (stash !== null) {\n\t\t\t\tthis.stash = stash;\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Flow.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.Template';\n\n\n\t\t\tlet settings = data['arguments'][0] || {};\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tif (this.profile !== null)                 settings.profile  = this.profile;\n\t\t\tif (this.sandbox !== '')                   settings.sandbox  = this.sandbox;\n\t\t\tif (Object.keys(this.settings).length > 0) settings.settings = this.settings;\n\n\n\t\t\tif (this.environment !== null) blob.environment = lychee.serialize(this.environment);\n\t\t\tif (this.shell !== null)       blob.shell       = lychee.serialize(this.shell);\n\t\t\tif (this.stash !== null)       blob.stash       = lychee.serialize(this.stash);\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetEnvironment: function(environment) {\n\n\t\t\tenvironment = environment instanceof lychee.Environment ? environment : null;\n\n\n\t\t\tif (environment !== null) {\n\n\t\t\t\tthis.environment = environment;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetProfile: function(profile) {\n\n\t\t\tprofile = profile instanceof Object ? profile : null;\n\n\n\t\t\tif (profile !== null) {\n\n\t\t\t\tthis.profile = profile;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSandbox: function(sandbox) {\n\n\t\t\tsandbox = typeof sandbox === 'string' ? sandbox : null;\n\n\n\t\t\tif (sandbox !== null) {\n\n\t\t\t\tthis.sandbox = sandbox;\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSettings: function(settings) {\n\n\t\t\tsettings = settings instanceof Object ? settings : null;\n\n\n\t\t\tif (settings !== null) {\n\n\t\t\t\tthis.settings = settings;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-nwjs.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-nwjs.Application"],"blob":{"attaches":{"config.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.config.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,ewoJIm1haW4iOiAgICAgICAgICIuL2luZGV4Lmh0bWwiLAoJIm5hbWUiOiAgICAgICAgICIke2lkfSIsCgkiZGVzY3JpcHRpb24iOiAgIiR7aWR9IChwb3dlcmVkIGJ5IGx5Y2hlZS5qcykiLAoJInZlcnNpb24iOiAgICAgICIke3ZlcnNpb259IiwKCSJ3aW5kb3ciOiB7CgkJInRpdGxlIjogICAgIiR7aWR9IChwb3dlcmVkIGJ5IGx5Y2hlZS5qcykiLAoJCSJpY29uIjogICAgICIuL2ljb24ucG5nIiwKCQkidG9vbGJhciI6ICAke2RlYnVnfSwKCQkiZnJhbWUiOiAgICB0cnVlLAoJCSJ3aWR0aCI6ICAgIDY0MCwKCQkiaGVpZ2h0IjogICA0ODAsCgkJInBvc2l0aW9uIjogImNlbnRlciIKCX0sCgkid2Via2l0IjogewoJCSJwbHVnaW4iOiBmYWxzZQoJfQp9Cg=="}},"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIEh0bWw+CjxodG1sPgo8aGVhZD4KCTxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KCTx0aXRsZT4ke2lkfTwvdGl0bGU+CgoJPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLCBtaW5pbXVtLXNjYWxlPTEsIG1heGltdW0tc2NhbGU9MSwgdXNlci1zY2FsYWJsZT1ubyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1jYXBhYmxlIiBjb250ZW50PSJ5ZXMiPgoJPG1ldGEgbmFtZT0iYXBwbGUtbW9iaWxlLXdlYi1hcHAtc3RhdHVzLWJhci1zdHlsZSIgY29udGVudD0iYmxhY2stdHJhbnNsdWNlbnQiPgoJPG1ldGEgaHR0cC1lcXVpdj0iWC1VQS1Db21wYXRpYmxlIiBjb250ZW50PSJJRT1lZGdlIiAvPgoJPGxpbmsgcmVsPSJpY29uIiBocmVmPSIuL2ljb24ucG5nIiBzaXplcz0iMTI4eDEyOCIgdHlwZT0iaW1hZ2UvcG5nIj4KCgk8c2NyaXB0IHNyYz0iLi9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlci1jYW52YXMgewoJCQlkaXNwbGF5OiBibG9jazsKCQkJbWFyZ2luOiAwIGF1dG87CgkJCXVzZXItc2VsZWN0OiBub25lOwoJCQktbW96LXVzZXItc2VsZWN0OiBub25lOwoJCQktbXMtdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS13ZWJraXQtdXNlci1zZWxlY3Q6IG5vbmU7CgkJfSAKCTwvc3R5bGU+Cgo8L2hlYWQ+Cjxib2R5Pgo8c2NyaXB0PgooZnVuY3Rpb24obHljaGVlLCBnbG9iYWwpIHsKCglsZXQgZW52aXJvbm1lbnQgPSBseWNoZWUuZGVzZXJpYWxpemUoJHtibG9ifSk7CglpZiAoZW52aXJvbm1lbnQgIT09IG51bGwpIHsKCQlseWNoZWUuZW52aW5pdChlbnZpcm9ubWVudCwgJHtwcm9maWxlfSk7Cgl9Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4K"}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tconfig: attachments[\"config.tpl\"],\n\t\tcore:   null,\n\t\ticon:   attachments[\"icon.png\"],\n\t\tindex:  attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__config = lychee.deserialize(lychee.serialize(_TEMPLATES.config));\n\t\tthis.__core   = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon   = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index  = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\t\t\tlet that   = this;\n\t\t\tlet load   = 3;\n\t\t\tlet config = this.stash.read('./package.json');\n\t\t\tlet core   = this.stash.read('/libraries/lychee/build/html-nwjs/core.js');\n\t\t\tlet icon   = this.stash.read('./icon.png');\n\n\t\t\tif (config !== null) {\n\n\t\t\t\tconfig.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__config = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tconfig.load();\n\n\t\t\t}\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (config === null && core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet config  = this.__config;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet icon    = this.__icon;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tif (!(config instanceof Config)) {\n\n\t\t\t\t\tconfig = new Config();\n\t\t\t\t\tconfig.buffer = JSON.parse(_TEMPLATES.config.buffer.replaceObject({\n\t\t\t\t\t\tdebug:   env.debug,\n\t\t\t\t\t\tid:      env.id,\n\t\t\t\t\t\tversion: lychee.VERSION\n\t\t\t\t\t}));\n\n\t\t\t\t}\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/package.json', config);\n\t\t\t\tstash.write(sandbox + '/core.js',      core);\n\t\t\t\tstash.write(sandbox + '/icon.png',     icon);\n\t\t\t\tstash.write(sandbox + '/index.html',   index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/html-nwjs/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-nwjs.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-nwjs.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-nwjs.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-nwjs.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-webview.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-webview.Application"],"blob":{"attaches":{"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html-webview/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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/NmwGoA9e/agqqpqIoB/FvlY/jEALZZlLfH7/buAD0+wKSVlAPYFHtm27QMwyxjzrwBmAji4iF/tUmb+3bAYANu2EY/HR1uW9TaA6iIS0i4ATwNYZYxZHgwG3wCALVu2YOLEiaodZUjfyM1wODyaiOYikZH6LBReCrFMzGbmJ3JqAGzbhuM4lUS0G0ChD4ZfIaIV8Xh8eVVV1YqampoeVXglk2c7evToff8Oh8NTiWg2gFlIxFwUdBCWMeakYDABSBYPAAACRUlEQVS4NicGIBKJoK2tzaqvr38bwDgUzpkCDoAXAKwiopcdx3kxGAxu7SMUna1XskIkEvHH4/FTieg0AB9DYifniAJ7zCOj0eibbgOFXGlGnzjsVgCT8/hy7QBeRmKGfjURvRwIBN5WZVfyOIwYaYyZAuDkPp98prfvATDWGNPhJho1o7b02b++HMCcYXqJrQBeAbAh+WlNrb8rSjEQDoePIqITARyLRHLYRgxfkti2WCw23uv1vpdpt6Wr7jJH5+DtRiIl+AYi2myM2WiMeS0YDG46kAFSlBLxGCYCOM4Yc3TSUzgaif0ch2b5VhuY+SOZtqiTC+X/dwC3D6En34xEHPkbRPSG4zibUjPwKXKxzVFRCpkDBZWJSAOAI40xRxHRkQCOBHAEElvCA4O4zRPMPDtdJ0oZ3JiZRHSgpYVuADuRSOC4FcBWItrqOM5bALb0nYTrM4Gi6+uK4oL+FDYcDo9OGoNDieiwpNcwMelJjAVwIH//Dmb+0qA8gOTpt+8YY7ZblrXTGLOTmSNaRYpSmDiOUyEi4yzLGktE44wxhwP4HTNrIlpFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURSlqPg/8yAgOX81704AAAAASUVORK5CYII="}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-webview/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KCTx0aXRsZT4ke2lkfTwvdGl0bGU+Cgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+CgoJPHNjcmlwdCBzcmM9Ii4vY29yZS5qcyI+PC9zY3JpcHQ+CgoJPHN0eWxlPgoJCWJvZHkgewoJCQltYXJnaW46IDA7CgkJCXBhZGRpbmc6IDA7CgkJfQoJCQoJCS5seWNoZWUtUmVuZGVyZXItY2FudmFzIHsKCQkJZGlzcGxheTogYmxvY2s7CgkJCW1hcmdpbjogMCBhdXRvOwoJCQl1c2VyLXNlbGVjdDogbm9uZTsKCQkJLW1vei11c2VyLXNlbGVjdDogbm9uZTsKCQkJLW1zLXVzZXItc2VsZWN0OiBub25lOwoJCQktd2Via2l0LXVzZXItc2VsZWN0OiBub25lOwoJCX0gCgk8L3N0eWxlPgoKPC9oZWFkPgo8Ym9keT4KPHNjcmlwdD4KKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbGV0IGVudmlyb25tZW50ID0gbHljaGVlLmRlc2VyaWFsaXplKCR7YmxvYn0pOwoJaWYgKGVudmlyb25tZW50ICE9PSBudWxsKSB7CgkJbHljaGVlLmVudmluaXQoZW52aXJvbm1lbnQsICR7cHJvZmlsZX0pOwoJfQoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwo8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+Cg=="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tcore:  null,\n\t\ticon:  attachments[\"icon.png\"],\n\t\tindex: attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__core  = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon  = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\t\t\tlet that = this;\n\t\t\tlet load = 2;\n\t\t\tlet core = this.stash.read('/libraries/lychee/build/html-webview/core.js');\n\t\t\tlet icon = this.stash.read('./icon.png');\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet icon    = this.__icon;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/core.js',    core);\n\t\t\t\tstash.write(sandbox + '/icon.png',   icon);\n\t\t\t\tstash.write(sandbox + '/index.html', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/html-webview/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-webview.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-webview.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-webview.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-webview/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-webview.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.node.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.node.Application"],"blob":{"attaches":{"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/node/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CnJlcXVpcmUoJy4vY29yZS5qcycpKF9fZGlybmFtZSk7CgoKKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbGV0IGVudmlyb25tZW50ID0gbHljaGVlLmRlc2VyaWFsaXplKCR7YmxvYn0pOwoJaWYgKGVudmlyb25tZW50ICE9PSBudWxsKSB7CgkJbHljaGVlLmVudmluaXQoZW52aXJvbm1lbnQsICR7cHJvZmlsZX0pOwoJfQoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwoK"}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tcore:  null,\n\t\tindex: attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__core  = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\n\t\t\tlet that = this;\n\t\t\tlet load = 1;\n\t\t\tlet core = this.stash.read('/libraries/lychee/build/node/core.js');\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\n\t\t\tif (core === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/core.js',  core);\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/node/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.node.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.node.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.node.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/node/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.node.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Flow":{"constructor":"lychee.Definition","arguments":["lychee.event.Flow"],"blob":{"attaches":{},"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Emitter = lychee.import('lychee.event.Emitter');\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_recursive = function(event, result) {\n\n\t\tif (result === true) {\n\n\t\t\tif (this.___timeout === null) {\n\n\t\t\t\tthis.___timeout = setTimeout(function() {\n\n\t\t\t\t\tthis.___timeout = null;\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t}.bind(this), 0);\n\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('error', [ event ]);\n\n\t\t}\n\n\t};\n\n\tconst _process_stack = function() {\n\n\t\tlet entry = this.___stack.shift() || null;\n\t\tif (entry !== null) {\n\n\t\t\tlet data  = entry.data;\n\t\t\tlet event = entry.event;\n\t\t\tlet args  = [ event, [] ];\n\n\t\t\tif (data !== null) {\n\t\t\t\targs[1].push.apply(args[1], data);\n\t\t\t}\n\n\t\t\targs[1].push(_process_recursive.bind(this, event));\n\n\n\t\t\tlet result = this.trigger.apply(this, args);\n\t\t\tif (result === false) {\n\t\t\t\tthis.trigger('error', [ event ]);\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('complete');\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___init    = false;\n\t\tthis.___stack   = [];\n\t\tthis.___timeout = null;\n\n\t\t_Emitter.call(this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.event.Flow';\n\n\t\t\tlet blob = (data['blob'] || {});\n\n\n\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\tblob.stack = [];\n\n\t\t\t\tfor (let s = 0, sl = this.___stack.length; s < sl; s++) {\n\n\t\t\t\t\tlet entry = this.___stack[s];\n\n\t\t\t\t\tblob.stack.push({\n\t\t\t\t\t\tevent: entry.event,\n\t\t\t\t\t\tdata:  lychee.serialize(entry.data)\n\t\t\t\t\t});\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['blob'] = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tthen: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tif (event !== null) {\n\n\t\t\t\tthis.___stack.push({\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  data\n\t\t\t\t});\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tinit: function() {\n\n\t\t\tif (this.___init === false) {\n\n\t\t\t\tthis.___init = true;\n\n\n\t\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Stash":{"constructor":"lychee.Definition","arguments":["lychee.Stash"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('fs');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tlet   _id         = 0;\n\tconst _Emitter    = lychee.import('lychee.event.Emitter');\n\tconst _PERSISTENT = {\n\t\tdata: {},\n\t\tread: function() {\n\t\t\treturn null;\n\t\t},\n\t\twrite: function(id, asset) {\n\t\t\treturn false;\n\t\t}\n\t};\n\tconst _TEMPORARY  = {\n\t\tdata: {},\n\t\tread: function() {\n\n\t\t\tif (Object.keys(this.data).length > 0) {\n\t\t\t\treturn this.data;\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\t\twrite: function(id, asset) {\n\n\t\t\tif (asset !== null) {\n\t\t\t\tthis.data[id] = asset;\n\t\t\t} else {\n\t\t\t\tdelete this.data[id];\n\t\t\t}\n\n\t\t\treturn true;\n\n\t\t}\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tconst _ENCODING = {\n\t\t\t'Config':  'utf8',\n\t\t\t'Font':    'utf8',\n\t\t\t'Music':   'binary',\n\t\t\t'Sound':   'binary',\n\t\t\t'Texture': 'binary',\n\t\t\t'Stuff':   'utf8'\n\t\t};\n\n\n\t\tconst _fs      = global.require('fs');\n\t\tconst _path    = global.require('path');\n\t\tconst _mkdir_p = function(path, mode) {\n\n\t\t\tif (mode === undefined) {\n\t\t\t\tmode = 0o777 & (~process.umask());\n\t\t\t}\n\n\n\t\t\tlet is_directory = false;\n\n\t\t\ttry {\n\n\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\n\t\t\t} catch (err) {\n\n\t\t\t\tif (err.code === 'ENOENT') {\n\n\t\t\t\t\tif (_mkdir_p(_path.dirname(path), mode) === true) {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.mkdirSync(path, mode);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\ttry {\n\t\t\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\t\t\t\t\t} catch (err) {\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn is_directory;\n\n\t\t};\n\n\n\t\tlet unlink = 'unlinkSync' in _fs;\n\t\tlet write  = 'writeFileSync' in _fs;\n\t\tif (unlink === true && write === true) {\n\n\t\t\t_PERSISTENT.write = function(id, asset) {\n\n\t\t\t\tlet result = false;\n\n\n\t\t\t\tlet path = lychee.environment.resolve(id);\n\t\t\t\tif (path.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\n\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\tlet dir = path.split('/').slice(0, -1).join('/');\n\t\t\t\t\t\tif (dir.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\t\t\t\t\t\t\t_mkdir_p(dir);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tlet data = lychee.serialize(asset);\n\t\t\t\t\t\tif (data !== null && data.blob !== null && typeof data.blob.buffer === 'string') {\n\n\t\t\t\t\t\t\tlet encoding = _ENCODING[data.constructor] || _ENCODING['Stuff'];\n\t\t\t\t\t\t\tlet index    = data.blob.buffer.indexOf('base64,') + 7;\n\t\t\t\t\t\t\tif (index > 7) {\n\n\t\t\t\t\t\t\t\tlet buffer = new Buffer(data.blob.buffer.substr(index, data.blob.buffer.length - index), 'base64');\n\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\t_fs.writeFileSync(path, buffer, encoding);\n\t\t\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.unlinkSync(path);\n\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\treturn result;\n\n\t\t\t};\n\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (write && unlink) methods.push('Persistent');\n\t\t\tif (_TEMPORARY)      methods.push('Temporary');\n\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Stash: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Stash: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _validate_asset = function(asset) {\n\n\t\tif (asset instanceof Object && typeof asset.serialize === 'function') {\n\t\t\treturn true;\n\t\t}\n\n\t\treturn false;\n\n\t};\n\n\tconst _on_batch_remove = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(null);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'remove', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_remove);\n\t\t}\n\n\t};\n\n\tconst _on_batch_write = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(others[key]);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'write', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_write);\n\t\t}\n\n\t};\n\n\tconst _read_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet blob = null;\n\n\n\t\tlet type = this.type;\n\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\tblob = _PERSISTENT.read();\n\n\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\tblob = _TEMPORARY.read();\n\n\t\t}\n\n\n\t\tif (blob !== null) {\n\n\t\t\tif (Object.keys(this.__assets).length !== Object.keys(blob).length) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob) {\n\t\t\t\t\tthis.__assets[id] = blob[id];\n\t\t\t\t}\n\n\n\t\t\t\tif (silent === false) {\n\t\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _write_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet operations = this.__operations;\n\t\tlet filtered   = {};\n\n\t\tif (operations.length !== 0) {\n\n\t\t\twhile (operations.length > 0) {\n\n\t\t\t\tlet operation = operations.shift();\n\t\t\t\tif (operation.type === 'update') {\n\n\t\t\t\t\tfiltered[operation.id] = operation.asset;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== operation.asset) {\n\t\t\t\t\t\tthis.__assets[operation.id] = operation.asset;\n\t\t\t\t\t}\n\n\t\t\t\t} else if (operation.type === 'remove') {\n\n\t\t\t\t\tfiltered[operation.id] = null;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== null) {\n\t\t\t\t\t\tthis.__assets[operation.id] = null;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tlet type = this.type;\n\t\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_PERSISTENT.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_TEMPORARY.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (silent === false) {\n\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.id   = 'lychee-Stash-' + _id++;\n\t\tthis.type = Composite.TYPE.persistent;\n\n\n\t\tthis.__assets     = {};\n\t\tthis.__operations = [];\n\n\n\t\tthis.setId(settings.id);\n\t\tthis.setType(settings.type);\n\n\n\t\t_Emitter.call(this);\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\t_read_stash.call(this);\n\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.TYPE = {\n\t\tpersistent: 0,\n\t\ttemporary:  1\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tsync: function(silent) {\n\n\t\t\tsilent = silent === true;\n\n\n\t\t\tlet result = false;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'sync'\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\tif (this.__operations.length > 0) {\n\t\t\t\tresult = _write_stash.call(this, silent);\n\t\t\t} else {\n\t\t\t\tresult = _read_stash.call(this, silent);\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.assets instanceof Object) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob.assets) {\n\t\t\t\t\tthis.__assets[id] = lychee.deserialize(blob.assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Stash';\n\n\t\t\tlet settings = {};\n\t\t\tlet blob     = (data['blob'] || {});\n\n\n\t\t\tif (this.id.substr(0, 13) !== 'lychee-Stash-') settings.id   = this.id;\n\t\t\tif (this.type !== Composite.TYPE.persistent)   settings.type = this.type;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tblob.assets = {};\n\n\t\t\t\tfor (let id in this.__assets) {\n\t\t\t\t\tblob.assets[id] = lychee.serialize(this.__assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbatch: function(action, ids, assets) {\n\n\t\t\taction = typeof action === 'string' ? action : null;\n\t\t\tids    = ids instanceof Array       ? ids    : null;\n\t\t\tassets = assets instanceof Array    ? assets : null;\n\n\n\t\t\tif (action !== null) {\n\n\t\t\t\tlet cache  = {\n\t\t\t\t\tload:  [].slice.call(ids),\n\t\t\t\t\tready: []\n\t\t\t\t};\n\n\n\t\t\t\tlet result = true;\n\t\t\t\tlet that   = this;\n\t\t\t\tlet il     = ids.length;\n\n\t\t\t\tif (action === 'read') {\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tlet asset = this.read(ids[i]);\n\t\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\t\tasset.onload = function(result) {\n\n\t\t\t\t\t\t\t\tlet index = cache.load.indexOf(this.url);\n\t\t\t\t\t\t\t\tif (index !== -1) {\n\t\t\t\t\t\t\t\t\tcache.ready.push(this);\n\t\t\t\t\t\t\t\t\tcache.load.splice(index, 1);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\tif (cache.load.length === 0) {\n\t\t\t\t\t\t\t\t\tthat.trigger('batch', [ 'read', cache.ready ]);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\tasset.load();\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tresult = false;\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'remove') {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_remove, cache);\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tif (this.remove(ids[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_remove);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'write' && ids.length === assets.length) {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_write, cache);\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tif (this.write(ids[i], assets[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_write);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tread: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tlet asset = new lychee.Asset(id, null, true);\n\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\tthis.__assets[id] = asset;\n\n\t\t\t\t\treturn asset;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tremove: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'remove',\n\t\t\t\t\tid:   id\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\twrite: function(id, asset) {\n\n\t\t\tid    = typeof id === 'string'          ? id    : null;\n\t\t\tasset = _validate_asset(asset) === true ? asset : null;\n\n\n\t\t\tif (id !== null && asset !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype:  'update',\n\t\t\t\t\tid:    id,\n\t\t\t\t\tasset: asset\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetId: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.id = id;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetType: function(type) {\n\n\t\t\ttype = lychee.enumof(Composite.TYPE, type) ? type : null;\n\n\n\t\t\tif (type !== null) {\n\n\t\t\t\tthis.type = type;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}}},"features":{"process":{"stdin":{"on":"function"}},"require":"function"}}});
+	let environment = lychee.deserialize({"constructor":"lychee.Environment","arguments":[{"id":"/libraries/fertilizer/dist","build":"fertilizer.Main","debug":false,"sandbox":false,"timeout":5000,"type":"build","tags":{"platform":["node"]}}],"blob":{"definitions":{"fertilizer.Main":{"constructor":"lychee.Definition","arguments":["fertilizer.Main"],"blob":{"attaches":{},"requires":["lychee.Input","lychee.codec.JSON","fertilizer.data.Shell","fertilizer.template.html.Application","fertilizer.template.html.Library","fertilizer.template.html-nwjs.Application","fertilizer.template.html-nwjs.Library","fertilizer.template.html-webview.Application","fertilizer.template.html-webview.Library","fertilizer.template.node.Application","fertilizer.template.node.Library"],"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _lychee   = lychee.import('lychee');\n\tconst _template = lychee.import('fertilizer.template');\n\tconst _Emitter  = lychee.import('lychee.event.Emitter');\n\tconst _Input    = lychee.import('lychee.Input');\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _JSON     = lychee.import('lychee.codec.JSON');\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(settings) {\n\n\t\tthis.settings = _lychee.assignunlink({\n\t\t\tproject:    null,\n\t\t\tidentifier: null,\n\t\t\tsettings:   null\n\t\t}, settings);\n\n\t\tthis.defaults = _lychee.assignunlink({\n\t\t\tproject:    null,\n\t\t\tidentifier: null,\n\t\t\tsettings:   null\n\t\t}, this.settings);\n\n\n\t\t_Emitter.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('load', function() {\n\n\t\t\tlet identifier = this.settings.identifier || null;\n\t\t\tlet project    = this.settings.project    || null;\n\t\t\tlet data       = this.settings.settings   || null;\n\n\t\t\tif (identifier !== null && project !== null && data !== null) {\n\n\t\t\t\tlet platform = data.tags.platform[0] || null;\n\t\t\t\tlet variant  = data.variant || null;\n\t\t\t\tlet settings = _JSON.decode(_JSON.encode(Object.assign({}, data, {\n\t\t\t\t\tdebug:   false,\n\t\t\t\t\tsandbox: true,\n\t\t\t\t\ttimeout: 5000,\n\t\t\t\t\ttype:    'export'\n\t\t\t\t})));\n\n\n\t\t\t\tlet profile = {};\n\t\t\t\tif (settings.profile instanceof Object) {\n\t\t\t\t\tprofile = settings.profile;\n\t\t\t\t}\n\n\n\t\t\t\tif (platform !== null && /application|library/g.test(variant)) {\n\n\t\t\t\t\tif (settings.packages instanceof Array) {\n\n\t\t\t\t\t\tsettings.packages = settings.packages.map(function(pkg) {\n\n\t\t\t\t\t\t\tlet id   = pkg[0];\n\t\t\t\t\t\t\tlet path = pkg[1];\n\t\t\t\t\t\t\tif (path.substr(0, 2) === './') {\n\t\t\t\t\t\t\t\tpath = project + '/' + path.substr(2);\n\t\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\t\treturn [ id, path ];\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tlet that           = this;\n\t\t\t\t\tlet environment    = new _lychee.Environment(settings);\n\t\t\t\t\tlet fertilizer_pkg = environment.packages.filter(function(pkg) {\n\t\t\t\t\t\treturn pkg.id === 'fertilizer';\n\t\t\t\t\t})[0] || null;\n\n\t\t\t\t\tif (fertilizer_pkg !== null) {\n\n\t\t\t\t\t\tfor (let id in _lychee.environment.definitions) {\n\t\t\t\t\t\t\tenvironment.define(_lychee.environment.definitions[id]);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\t_lychee.debug = false;\n\t\t\t\t\t_lychee.setEnvironment(environment);\n\n\n\t\t\t\t\tenvironment.init(function(sandbox) {\n\n\t\t\t\t\t\tif (sandbox !== null) {\n\n\t\t\t\t\t\t\t// IMPORTANT: Don't use Environment's imperative API here!\n\t\t\t\t\t\t\t// Environment identifier is /libraries/lychee/main instead of /libraries/lychee/html/main\n\n\t\t\t\t\t\t\tenvironment.id       = project + '/' + identifier.split('/').pop();\n\t\t\t\t\t\t\tenvironment.type     = 'build';\n\t\t\t\t\t\t\tenvironment.debug    = that.defaults.settings.debug;\n\t\t\t\t\t\t\tenvironment.sandbox  = that.defaults.settings.sandbox;\n\t\t\t\t\t\t\tenvironment.packages = [];\n\n\n\t\t\t\t\t\t\t_lychee.setEnvironment(null);\n\n\n\t\t\t\t\t\t\tthat.trigger('init', [ project, identifier, platform, variant, environment, profile ]);\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"load\" event');\n\n\t\t\t\t\t\t\tif (typeof environment.global.console.serialize === 'function') {\n\n\t\t\t\t\t\t\t\tlet debug = environment.global.console.serialize();\n\t\t\t\t\t\t\t\tif (debug.blob !== null) {\n\n\t\t\t\t\t\t\t\t\t(debug.blob.stderr || '').trim().split('\\n').map(function(line) {\n\t\t\t\t\t\t\t\t\t\treturn (line.indexOf(':') !== -1 ? line.split(':')[1].trim() : '');\n\t\t\t\t\t\t\t\t\t}).forEach(function(line) {\n\t\t\t\t\t\t\t\t\t\tconsole.error('fertilizer: ' + line);\n\t\t\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\t\tthat.destroy(1);\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t});\n\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t} else if (project !== null) {\n\n\t\t\t\tthis.trigger('init', [ project, identifier, null, null ]);\n\n\t\t\t\treturn true;\n\n\t\t\t} else {\n\n\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"load\" event');\n\t\t\t\tthis.destroy(1);\n\n\n\t\t\t\treturn false;\n\n\t\t\t}\n\n\t\t}, this, true);\n\n\t\tthis.bind('init', function(project, identifier, platform, variant, environment, profile) {\n\n\t\t\tlet construct = null;\n\t\t\tif (platform !== null && variant !== null && typeof _template[platform] === 'object') {\n\t\t\t\tconstruct = _template[platform][variant.charAt(0).toUpperCase() + variant.substr(1).toLowerCase()] || null;\n\t\t\t} else {\n\t\t\t\tconstruct = _Template;\n\t\t\t}\n\n\n\t\t\tif (construct !== null) {\n\n\t\t\t\tlychee.ROOT.project                           = _lychee.ROOT.lychee + project;\n\t\t\t\tlychee.environment.global.lychee.ROOT.project = _lychee.ROOT.lychee + project;\n\n\n\t\t\t\tlet template = new construct({});\n\t\t\t\tif (template instanceof _Template) {\n\n\t\t\t\t\t// XXX: Third-party project\n\n\t\t\t\t\ttemplate.setSandbox(project + '/build');\n\n\t\t\t\t\ttemplate.then('configure-project');\n\t\t\t\t\ttemplate.then('build-project');\n\t\t\t\t\ttemplate.then('package-project');\n\n\t\t\t\t} else {\n\n\t\t\t\t\t// XXX: lychee.js project\n\n\t\t\t\t\ttemplate.setEnvironment(environment);\n\t\t\t\t\ttemplate.setProfile(profile);\n\t\t\t\t\ttemplate.setSandbox(project + '/build/' + identifier);\n\n\t\t\t\t\ttemplate.then('configure');\n\t\t\t\t\ttemplate.then('configure-project');\n\t\t\t\t\ttemplate.then('build');\n\t\t\t\t\ttemplate.then('build-project');\n\t\t\t\t\ttemplate.then('package');\n\t\t\t\t\ttemplate.then('package-project');\n\n\t\t\t\t}\n\n\n\t\t\t\ttemplate.bind('configure-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/configure.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\t\tconsole.info('fertilizer: CONFIGURE-PROJECT SUCCESS');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tconsole.warn('fertilizer: CONFIGURE-PROJECT FAILURE');\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\t\t\t\ttemplate.bind('build-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/build.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\t\tconsole.info('fertilizer: BUILD-PROJECT SUCCESS');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tconsole.warn('fertilizer: BUILD-PROJECT FAILURE');\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\t\t\t\ttemplate.bind('package-project', function(oncomplete) {\n\n\t\t\t\t\tthis.shell.exec(project + '/bin/package.sh ' + identifier, function(result) {\n\n\t\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\t\tconsole.info('fertilizer: PACKAGE-PROJECT SUCCESS');\n\t\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tconsole.warn('fertilizer: PACKAGE-PROJECT FAILURE');\n\t\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t});\n\n\t\t\t\t}, template);\n\n\n\t\t\t\ttemplate.bind('complete', function() {\n\n\t\t\t\t\tconsole.info('fertilizer: SUCCESS (\"' + project + ' | ' + identifier + '\")');\n\t\t\t\t\tthis.destroy(0);\n\n\t\t\t\t}, this);\n\n\t\t\t\ttemplate.bind('error', function(event) {\n\n\t\t\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"' + event + '\" event');\n\t\t\t\t\tthis.destroy(1);\n\n\t\t\t\t}, this);\n\n\n\t\t\t\ttemplate.init();\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\tconsole.error('fertilizer: FAILURE (\"' + project + ' | ' + identifier + '\") at \"init\" event');\n\t\t\tthis.destroy(1);\n\n\n\t\t\treturn false;\n\n\t\t}, this, true);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.Main';\n\n\n\t\t\tlet settings = _lychee.assignunlink({}, this.settings);\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * MAIN API\n\t\t */\n\n\t\tinit: function() {\n\n\t\t\tthis.trigger('load');\n\n\t\t\treturn true;\n\n\t\t},\n\n\t\tdestroy: function(code) {\n\n\t\t\tcode = typeof code === 'number' ? code : 0;\n\n\n\t\t\tthis.trigger('destroy', [ code ]);\n\n\t\t\treturn true;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Emitter":{"constructor":"lychee.Definition","arguments":["lychee.event.Emitter"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _bind = function(event, callback, scope, once) {\n\n\t\tif (event === null || callback === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet pass_event = false;\n\t\tlet pass_self  = false;\n\n\t\tlet modifier = event.charAt(0);\n\t\tif (modifier === '@') {\n\n\t\t\tevent      = event.substr(1, event.length - 1);\n\t\t\tpass_event = true;\n\n\t\t} else if (modifier === '#') {\n\n\t\t\tevent     = event.substr(1, event.length - 1);\n\t\t\tpass_self = true;\n\n\t\t}\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: pass_event,\n\t\t\tpass_self:  pass_self,\n\t\t\tcallback:   callback,\n\t\t\tscope:      scope,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _relay = function(event, instance, once) {\n\n\t\tif (event === null || instance === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet callback = function() {\n\n\t\t\tlet event = arguments[0];\n\t\t\tlet data  = [];\n\n\t\t\tfor (let a = 1, al = arguments.length; a < al; a++) {\n\t\t\t\tdata.push(arguments[a]);\n\t\t\t}\n\n\t\t\tthis.trigger(event, data);\n\n\t\t};\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: true,\n\t\t\tpass_self:  false,\n\t\t\tcallback:   callback,\n\t\t\tscope:      instance,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _trigger = function(event, data) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet value = undefined;\n\n\t\t\tfor (let e = 0; e < this.___events[event].length; e++) {\n\n\t\t\t\tlet args  = [];\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif (entry.pass_event === true) {\n\n\t\t\t\t\targs.push(event);\n\n\t\t\t\t} else if (entry.pass_self === true) {\n\n\t\t\t\t\targs.push(this);\n\n\t\t\t\t}\n\n\n\t\t\t\tif (data !== null) {\n\t\t\t\t\targs.push.apply(args, data);\n\t\t\t\t}\n\n\n\t\t\t\tlet result = entry.callback.apply(entry.scope, args);\n\t\t\t\tif (result !== undefined) {\n\t\t\t\t\tvalue = result;\n\t\t\t\t}\n\n\n\t\t\t\tif (entry.once === true) {\n\n\t\t\t\t\tif (this.unbind(event, entry.callback, entry.scope) === true) {\n\t\t\t\t\t\te--;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (value !== undefined) {\n\t\t\t\treturn value;\n\t\t\t} else {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _unbind = function(event, callback, scope) {\n\n\t\tlet found = false;\n\n\t\tif (event !== null) {\n\n\t\t\tfound = _unbind_event.call(this, event, callback, scope);\n\n\t\t} else {\n\n\t\t\tfor (event in this.___events) {\n\n\t\t\t\tlet result = _unbind_event.call(this, event, callback, scope);\n\t\t\t\tif (result === true) {\n\t\t\t\t\tfound = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn found;\n\n\t};\n\n\tconst _unbind_event = function(event, callback, scope) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif ((callback === null || entry.callback === callback) && (scope === null || entry.scope === scope)) {\n\n\t\t\t\t\tfound = true;\n\n\t\t\t\t\tthis.___events[event].splice(e, 1);\n\t\t\t\t\tel--;\n\t\t\t\t\te--;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn found;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___events   = {};\n\t\tthis.___timeline = {\n\t\t\tbind:    [],\n\t\t\ttrigger: [],\n\t\t\trelay:   [],\n\t\t\tunbind:  []\n\t\t};\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.events instanceof Object) {\n\t\t\t\t// TODO: deserialize events\n\t\t\t}\n\n\t\t\tif (blob.timeline instanceof Object) {\n\t\t\t\t// TODO: deserialize timeline\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (Object.keys(this.___events).length > 0) {\n\n\t\t\t\tblob.events = {};\n\n\t\t\t\tfor (let event in this.___events) {\n\n\t\t\t\t\tblob.events[event] = [];\n\n\t\t\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\t\t\tblob.events[event].push({\n\t\t\t\t\t\t\tpass_event: entry.pass_event,\n\t\t\t\t\t\t\tpass_self:  entry.pass_self,\n\t\t\t\t\t\t\tcallback:   lychee.serialize(entry.callback),\n\t\t\t\t\t\t\t// scope:      lychee.serialize(entry.scope),\n\t\t\t\t\t\t\tscope:      null,\n\t\t\t\t\t\t\tonce:       entry.once\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (this.___timeline.bind.length > 0 || this.___timeline.trigger.length > 0 || this.___timeline.unbind.length > 0) {\n\n\t\t\t\tblob.timeline = {};\n\n\n\t\t\t\tif (this.___timeline.bind.length > 0) {\n\n\t\t\t\t\tblob.timeline.bind = [];\n\n\t\t\t\t\tfor (let b = 0, bl = this.___timeline.bind.length; b < bl; b++) {\n\t\t\t\t\t\tblob.timeline.bind.push(this.___timeline.bind[b]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.trigger.length > 0) {\n\n\t\t\t\t\tblob.timeline.trigger = [];\n\n\t\t\t\t\tfor (let t = 0, tl = this.___timeline.trigger.length; t < tl; t++) {\n\t\t\t\t\t\tblob.timeline.trigger.push(this.___timeline.trigger[t]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.unbind.length > 0) {\n\n\t\t\t\t\tblob.timeline.unbind = [];\n\n\t\t\t\t\tfor (let u = 0, ul = this.___timeline.unbind.length; u < ul; u++) {\n\t\t\t\t\t\tblob.timeline.unbind.push(this.___timeline.unbind[u]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'lychee.event.Emitter',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbind: function(event, callback, scope, once) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _bind.call(this, event, callback, scope, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.bind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope),\n\t\t\t\t\tscope:    null,\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\trelay: function(event, instance, once) {\n\n\t\t\tevent    = typeof event === 'string'               ? event    : null;\n\t\t\tinstance = lychee.interfaceof(Composite, instance) ? instance : null;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _relay.call(this, event, instance, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.relay.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tinstance: lychee.serialize(instance),\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\ttrigger: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tlet result = _trigger.call(this, event, data);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.trigger.push({\n\t\t\t\t\ttime:  Date.now(),\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  lychee.serialize(data)\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tunbind: function(event, callback, scope) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : null;\n\n\n\t\t\tlet result = _unbind.call(this, event, callback, scope);\n\t\t\tif (result === true) {\n\n\t\t\t\tthis.___timeline.unbind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope)\n\t\t\t\t\tscope:    null\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Input":{"constructor":"lychee.Definition","arguments":["lychee.Input"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (\n\t\ttypeof global.process !== 'undefined'\n\t\t&& typeof global.process.stdin === 'object'\n\t\t&& typeof global.process.stdin.on === 'function'\n\t) {\n\t\treturn true;\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _process   = global.process;\n\tconst _Emitter   = lychee.import('lychee.event.Emitter');\n\tconst _INSTANCES = [];\n\n\n\n\t/*\n\t * EVENTS\n\t */\n\n\tconst _listeners = {\n\n\t\tkeypress: function(key) {\n\n\t\t\t// TTY conform behaviour\n\t\t\tif (key.ctrl === true && key.name === 'c') {\n\n\t\t\t\tkey.name  = 'escape';\n\t\t\t\tkey.ctrl  = false;\n\t\t\t\tkey.alt   = false;\n\t\t\t\tkey.shift = false;\n\n\t\t\t}\n\n\n\t\t\tfor (let i = 0, l = _INSTANCES.length; i < l; i++) {\n\t\t\t\t_process_key.call(_INSTANCES[i], key.name, key.ctrl, key.meta, key.shift);\n\t\t\t}\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tlet keypress = true;\n\t\tif (keypress === true) {\n\t\t\t_process.stdin.on('keypress', _listeners.keypress);\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (keypress) methods.push('Keyboard');\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Input: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Input: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_key = function(key, ctrl, alt, shift) {\n\n\t\tif (this.key === false) {\n\n\t\t\treturn false;\n\n\t\t} else if (this.keymodifier === false) {\n\n\t\t\tif (key === 'ctrl' || key === 'meta' || key === 'shift') {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\tlet name    = '';\n\t\tlet handled = false;\n\t\tlet delta   = Date.now() - this.__clock.key;\n\n\t\tif (delta < this.delay) {\n\t\t\treturn true;\n\t\t} else {\n\t\t\tthis.__clock.key = Date.now();\n\t\t}\n\n\n\t\t// 0. Computation: Normal Characters\n\t\tif (ctrl  === true) name += 'ctrl-';\n\t\tif (alt   === true) name += 'alt-';\n\t\tif (shift === true) name += 'shift-';\n\n\t\tname += key.toLowerCase();\n\n\n\t\t// 1. Event API\n\t\tif (key !== null) {\n\n\t\t\t// allow bind('key') and bind('ctrl-a');\n\n\t\t\thandled = this.trigger('key', [ key, name, delta ]) || handled;\n\t\t\thandled = this.trigger(name,  [ delta ])            || handled;\n\n\t\t}\n\n\n\t\treturn handled;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.delay       = 0;\n\t\tthis.key         = false;\n\t\tthis.keymodifier = false;\n\t\tthis.touch       = false;\n\t\tthis.swipe       = false;\n\n\t\tthis.__clock  = {\n\t\t\tkey:   Date.now(),\n\t\t\ttouch: Date.now(),\n\t\t\tswipe: Date.now()\n\t\t};\n\n\n\t\tthis.setDelay(settings.delay);\n\t\tthis.setKey(settings.key);\n\t\tthis.setKeyModifier(settings.keymodifier);\n\t\tthis.setTouch(settings.touch);\n\t\tthis.setSwipe(settings.swipe);\n\n\n\t\t_Emitter.call(this);\n\n\t\t_INSTANCES.push(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\tdestroy: function() {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let i = 0, il = _INSTANCES.length; i < il; i++) {\n\n\t\t\t\tif (_INSTANCES[i] === this) {\n\t\t\t\t\t_INSTANCES.splice(i, 1);\n\t\t\t\t\tfound = true;\n\t\t\t\t\til--;\n\t\t\t\t\ti--;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tthis.unbind();\n\n\n\t\t\treturn found;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Input';\n\n\t\t\tlet settings = {};\n\n\n\t\t\tif (this.delay !== 0)           settings.delay       = this.delay;\n\t\t\tif (this.key !== false)         settings.key         = this.key;\n\t\t\tif (this.keymodifier !== false) settings.keymodifier = this.keymodifier;\n\t\t\tif (this.touch !== false)       settings.touch       = this.touch;\n\t\t\tif (this.swipe !== false)       settings.swipe       = this.swipe;\n\n\n\t\t\tdata['arguments'][0] = settings;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetDelay: function(delay) {\n\n\t\t\tdelay = typeof delay === 'number' ? delay : null;\n\n\n\t\t\tif (delay !== null) {\n\n\t\t\t\tthis.delay = delay;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKey: function(key) {\n\n\t\t\tkey = typeof key === 'boolean' ? key : null;\n\n\n\t\t\tif (key !== null) {\n\n\t\t\t\tthis.key = key;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKeyModifier: function(keymodifier) {\n\n\t\t\tkeymodifier = typeof keymodifier === 'boolean' ? keymodifier : null;\n\n\n\t\t\tif (keymodifier !== null) {\n\n\t\t\t\tthis.keymodifier = keymodifier;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetTouch: function(touch) {\n\n\t\t\ttouch = typeof touch === 'boolean' ? touch : null;\n\n\n\t\t\tif (touch !== null) {\n\n\t\t\t\t// XXX: No touch support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetScroll: function(scroll) {\n\n\t\t\tscroll = typeof scroll === 'boolean' ? scroll : null;\n\n\n\t\t\tif (scroll !== null) {\n\n\t\t\t\t// XXX: No scroll support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSwipe: function(swipe) {\n\n\t\t\tswipe = typeof swipe === 'boolean' ? swipe : null;\n\n\n\t\t\tif (swipe !== null) {\n\n\t\t\t\t// XXX: No swipe support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.codec.JSON":{"constructor":"lychee.Definition","arguments":["lychee.codec.JSON"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _CHARS_SEARCH = /[\\\\\\\"\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u0600-\\u0604\\u070f\\u17b4\\u17b5\\u200c-\\u200f\\u2028-\\u202f\\u2060-\\u206f\\ufeff\\ufff0-\\uffff]/g;\n\tconst _CHARS_META   = {\n\t\t'\\r': '',    // FUCK YOU, Microsoft!\n\t\t'\\b': '\\\\b',\n\t\t'\\t': '\\\\t',\n\t\t'\\n': '\\\\n',\n\t\t'\\f': '\\\\f',\n\t\t'\"':  '\\\\\"',\n\t\t'\\\\': '\\\\\\\\'\n\t};\n\n\tconst _desanitize_string = function(san) {\n\n\t\tlet str = san;\n\n\t\t// str = str.replace(/\\\\b/g, '\\b');\n\t\t// str = str.replace(/\\\\f/g, '\\f');\n\t\tstr = str.replace(/\\\\t/g, '\\t');\n\t\tstr = str.replace(/\\\\n/g, '\\n');\n\t\tstr = str.replace(/\\\\\\\\/g, '\\\\');\n\n\t\treturn str;\n\n\t};\n\n\tconst _sanitize_string = function(str) {\n\n\t\tlet san = str;\n\n\t\tif (_CHARS_SEARCH.test(san)) {\n\n\t\t\tsan = san.replace(_CHARS_SEARCH, function(char) {\n\n\t\t\t\tlet meta = _CHARS_META[char];\n\t\t\t\tif (meta !== undefined) {\n\t\t\t\t\treturn meta;\n\t\t\t\t} else {\n\t\t\t\t\treturn '\\\\u' + (char.charCodeAt(0).toString(16)).slice(-4);\n\t\t\t\t}\n\n\t\t\t});\n\n\t\t}\n\n\t\treturn san;\n\n\t};\n\n\n\n\tconst _Stream = function(buffer, mode) {\n\n\t\tthis.__buffer = typeof buffer === 'string'        ? buffer : '';\n\t\tthis.__mode   = lychee.enumof(_Stream.MODE, mode) ? mode   : 0;\n\n\t\tthis.__index  = 0;\n\n\t};\n\n\n\t_Stream.MODE = {\n\t\tread:  0,\n\t\twrite: 1\n\t};\n\n\n\t_Stream.prototype = {\n\n\t\ttoString: function() {\n\t\t\treturn this.__buffer;\n\t\t},\n\n\t\tpointer: function() {\n\t\t\treturn this.__index;\n\t\t},\n\n\t\tlength: function() {\n\t\t\treturn this.__buffer.length;\n\t\t},\n\n\t\tread: function(bytes) {\n\n\t\t\tlet buffer = '';\n\n\t\t\tbuffer       += this.__buffer.substr(this.__index, bytes);\n\t\t\tthis.__index += bytes;\n\n\t\t\treturn buffer;\n\n\t\t},\n\n\t\tsearch: function(array) {\n\n\t\t\tlet bytes = Infinity;\n\n\t\t\tfor (let a = 0, al = array.length; a < al; a++) {\n\n\t\t\t\tlet token = array[a];\n\t\t\t\tlet size  = this.__buffer.indexOf(token, this.__index + 1) - this.__index;\n\t\t\t\tif (size > -1 && size < bytes) {\n\t\t\t\t\tbytes = size;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (bytes === Infinity) {\n\t\t\t\treturn 0;\n\t\t\t}\n\n\n\t\t\treturn bytes;\n\n\t\t},\n\n\t\tseek: function(bytes) {\n\n\t\t\tif (bytes > 0) {\n\t\t\t\treturn this.__buffer.substr(this.__index, bytes);\n\t\t\t} else {\n\t\t\t\treturn this.__buffer.substr(this.__index + bytes, Math.abs(bytes));\n\t\t\t}\n\n\t\t},\n\n\t\twrite: function(buffer) {\n\n\t\t\tthis.__buffer += buffer;\n\t\t\tthis.__index  += buffer.length;\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * ENCODER and DECODER\n\t */\n\n\tconst _encode = function(stream, data) {\n\n\t\t// null,false,true: Boolean or Null or EOS\n\t\tif (typeof data === 'boolean' || data === null) {\n\n\t\t\tif (data === null) {\n\t\t\t\tstream.write('null');\n\t\t\t} else if (data === false) {\n\t\t\t\tstream.write('false');\n\t\t\t} else if (data === true) {\n\t\t\t\tstream.write('true');\n\t\t\t}\n\n\n\t\t// 123,12.3: Integer or Float\n\t\t} else if (typeof data === 'number') {\n\n\t\t\tlet type = 1;\n\t\t\tif (data < 268435456 && data !== (data | 0)) {\n\t\t\t\ttype = 2;\n\t\t\t}\n\n\n\t\t\t// Negative value\n\t\t\tlet sign = 0;\n\t\t\tif (data < 0) {\n\t\t\t\tdata = -data;\n\t\t\t\tsign = 1;\n\t\t\t}\n\n\n\t\t\tif (sign === 1) {\n\t\t\t\tstream.write('-');\n\t\t\t}\n\n\n\t\t\tif (type === 1) {\n\t\t\t\tstream.write('' + data.toString());\n\t\t\t} else {\n\t\t\t\tstream.write('' + data.toString());\n\t\t\t}\n\n\n\t\t// \"\": String\n\t\t} else if (typeof data === 'string') {\n\n\t\t\tdata = _sanitize_string(data);\n\n\n\t\t\tstream.write('\"');\n\n\t\t\tstream.write(data);\n\n\t\t\tstream.write('\"');\n\n\n\t\t// []: Array\n\t\t} else if (data instanceof Array) {\n\n\t\t\tstream.write('[');\n\n\t\t\tfor (let d = 0, dl = data.length; d < dl; d++) {\n\n\t\t\t\t_encode(stream, data[d]);\n\n\t\t\t\tif (d < dl - 1) {\n\t\t\t\t\tstream.write(',');\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tstream.write(']');\n\n\n\t\t// {}: Object\n\t\t} else if (data instanceof Object && typeof data.serialize !== 'function') {\n\n\t\t\tstream.write('{');\n\n\t\t\tlet keys = Object.keys(data);\n\n\t\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\t\tlet key = keys[k];\n\n\t\t\t\t_encode(stream, key);\n\t\t\t\tstream.write(':');\n\n\t\t\t\t_encode(stream, data[key]);\n\n\t\t\t\tif (k < kl - 1) {\n\t\t\t\t\tstream.write(',');\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tstream.write('}');\n\n\n\t\t// Custom High-Level Implementation\n\t\t} else if (data instanceof Object && typeof data.serialize === 'function') {\n\n\t\t\tstream.write('%');\n\n\t\t\tlet blob = lychee.serialize(data);\n\n\t\t\t_encode(stream, blob);\n\n\t\t\tstream.write('%');\n\n\t\t}\n\n\t};\n\n\tconst _decode = function(stream) {\n\n\t\tlet value  = undefined;\n\t\tlet seek   = '';\n\t\tlet size   = 0;\n\t\tlet tmp    = 0;\n\t\tlet errors = 0;\n\t\tlet check  = null;\n\n\n\t\tif (stream.pointer() < stream.length()) {\n\n\t\t\tseek = stream.seek(1);\n\n\n\t\t\t// null,false,true: Boolean or Null or EOS\n\t\t\tif (seek === 'n' || seek === 'f' || seek === 't') {\n\n\t\t\t\tif (stream.seek(4) === 'null') {\n\t\t\t\t\tstream.read(4);\n\t\t\t\t\tvalue = null;\n\t\t\t\t} else if (stream.seek(5) === 'false') {\n\t\t\t\t\tstream.read(5);\n\t\t\t\t\tvalue = false;\n\t\t\t\t} else if (stream.seek(4) === 'true') {\n\t\t\t\t\tstream.read(4);\n\t\t\t\t\tvalue = true;\n\t\t\t\t}\n\n\n\t\t\t// 123: Number\n\t\t\t} else if (seek === '-' || !isNaN(parseInt(seek, 10))) {\n\n\t\t\t\tsize = stream.search([ ',', ']', '}' ]);\n\n\t\t\t\tif (size > 0) {\n\n\t\t\t\t\ttmp = stream.read(size);\n\n\t\t\t\t\tif (tmp.indexOf('.') !== -1) {\n\t\t\t\t\t\tvalue = parseFloat(tmp, 10);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tvalue = parseInt(tmp, 10);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t// \"\": String\n\t\t\t} else if (seek === '\"') {\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\tsize = stream.search([ '\"' ]);\n\n\t\t\t\tif (size > 0) {\n\t\t\t\t\tvalue = stream.read(size);\n\t\t\t\t} else {\n\t\t\t\t\tvalue = '';\n\t\t\t\t}\n\n\n\t\t\t\tcheck = stream.read(1);\n\n\n\t\t\t\tlet unichar = stream.seek(-2);\n\n\t\t\t\twhile (check === '\"' && unichar.charAt(0) === '\\\\') {\n\n\t\t\t\t\tif (value.charAt(value.length - 1) === '\\\\') {\n\t\t\t\t\t\tvalue = value.substr(0, value.length - 1) + check;\n\t\t\t\t\t}\n\n\t\t\t\t\tsize    = stream.search([ '\"' ]);\n\t\t\t\t\tvalue  += stream.read(size);\n\t\t\t\t\tcheck   = stream.read(1);\n\t\t\t\t\tunichar = stream.seek(-2);\n\n\t\t\t\t}\n\n\t\t\t\tvalue = _desanitize_string(value);\n\n\t\t\t// []: Array\n\t\t\t} else if (seek === '[') {\n\n\t\t\t\tvalue = [];\n\n\n\t\t\t\tsize  = stream.search([ ']' ]);\n\t\t\t\tcheck = stream.read(1).trim() + stream.seek(size).trim();\n\n\t\t\t\tif (check !== '[]') {\n\n\t\t\t\t\twhile (errors === 0) {\n\n\t\t\t\t\t\tvalue.push(_decode(stream));\n\n\t\t\t\t\t\tcheck = stream.seek(1);\n\n\t\t\t\t\t\tif (check === ',') {\n\t\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t\t} else if (check === ']') {\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\terrors++;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tstream.read(1);\n\n\t\t\t\t} else {\n\n\t\t\t\t\tstream.read(size);\n\n\t\t\t\t}\n\n\n\t\t\t// {}: Object\n\t\t\t} else if (seek === '{') {\n\n\t\t\t\tvalue = {};\n\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\twhile (errors === 0) {\n\n\t\t\t\t\tif (stream.seek(1) === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\n\n\t\t\t\t\tlet object_key = _decode(stream);\n\t\t\t\t\tcheck = stream.seek(1);\n\n\t\t\t\t\tif (check === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t} else if (check === ':') {\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t} else if (check !== ':') {\n\t\t\t\t\t\terrors++;\n\t\t\t\t\t}\n\n\t\t\t\t\tlet object_value = _decode(stream);\n\t\t\t\t\tcheck = stream.seek(1);\n\n\n\t\t\t\t\tvalue[object_key] = object_value;\n\n\n\t\t\t\t\tif (check === '}') {\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t} else if (check === ',') {\n\t\t\t\t\t\tstream.read(1);\n\t\t\t\t\t} else {\n\t\t\t\t\t\terrors++;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tstream.read(1);\n\n\t\t\t// %%: Custom High-Level Implementation\n\t\t\t} else if (seek === '%') {\n\n\t\t\t\tstream.read(1);\n\n\t\t\t\tlet blob = _decode(stream);\n\n\t\t\t\tvalue = lychee.deserialize(blob);\n\t\t\t\tcheck = stream.read(1);\n\n\t\t\t\tif (check !== '%') {\n\t\t\t\t\tvalue = undefined;\n\t\t\t\t}\n\n\t\t\t} else {\n\n\t\t\t\t// Invalid seek, assume it's a space character\n\n\t\t\t\tstream.read(1);\n\t\t\t\treturn _decode(stream);\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn value;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tconst Module = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\treturn {\n\t\t\t\t'reference': 'lychee.codec.JSON',\n\t\t\t\t'blob':      null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tencode: function(data) {\n\n\t\t\tdata = data instanceof Object ? data : null;\n\n\n\t\t\tif (data !== null) {\n\n\t\t\t\tlet stream = new _Stream('', _Stream.MODE.write);\n\n\t\t\t\t_encode(stream, data);\n\n\t\t\t\treturn new Buffer(stream.toString(), 'utf8');\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tdecode: function(data) {\n\n\t\t\tdata = data instanceof Buffer ? data : null;\n\n\n\t\t\tif (data !== null) {\n\n\t\t\t\tlet stream = new _Stream(data.toString('utf8'), _Stream.MODE.read);\n\t\t\t\tlet object = _decode(stream);\n\t\t\t\tif (object !== undefined) {\n\t\t\t\t\treturn object;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t}\n\n\t};\n\n\n\treturn Module;\n\n}"}},"fertilizer.data.Shell":{"constructor":"lychee.Definition","arguments":["fertilizer.data.Shell"],"blob":{"attaches":{},"tags":{"platform":"node"},"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('child_process');\n\t\t\tglobal.require('path');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _child_process = require('child_process');\n\tconst _ROOT          = lychee.ROOT.lychee;\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.__stack = [];\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.stack instanceof Array) {\n\n\t\t\t\tfor (let s = 0, sl = blob.stack.length; s < sl; s++) {\n\t\t\t\t\tthis.__stack.push(blob.stack[s]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (this.__stack.length > 0) {\n\t\t\t\tblob.stack = this.__stack.map(lychee.serialize);\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'fertilizer.data.Shell',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\texec: function(command, callback, scope) {\n\n\t\t\tcommand  = typeof command === 'string'  ? command  : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\n\n\t\t\tif (command !== null) {\n\n\t\t\t\tlet that = this;\n\t\t\t\tlet args = command.split(' ').slice(1);\n\t\t\t\tlet cmd  = command.split(' ')[0];\n\t\t\t\tlet file = _ROOT + (cmd.charAt(0) !== '/' ? '/' : '') + cmd;\n\t\t\t\tlet ext  = file.split('.').pop();\n\t\t\t\tlet path = file.split('/').slice(0, -1).join('/');\n\t\t\t\tif (path.split('/').pop() === 'bin') {\n\t\t\t\t\tpath = path.split('/').slice(0, -1).join('/');\n\t\t\t\t}\n\n\n\t\t\t\tif (ext === 'js') {\n\n\t\t\t\t\targs.reverse();\n\t\t\t\t\targs.push(file);\n\t\t\t\t\targs.push('env:node');\n\t\t\t\t\targs.reverse();\n\n\t\t\t\t\tfile = _ROOT + '/bin/helper.sh';\n\n\t\t\t\t}\n\n\n\t\t\t\tif (callback !== null) {\n\n\t\t\t\t\ttry {\n\n\t\t\t\t\t\t_child_process.execFile(file, args, {\n\t\t\t\t\t\t\tcwd: path\n\t\t\t\t\t\t}, function(error, stdout, stderr) {\n\n\t\t\t\t\t\t\tthat.__stack.push({\n\t\t\t\t\t\t\t\targs:   args,\n\t\t\t\t\t\t\t\tfile:   file,\n\t\t\t\t\t\t\t\tpath:   path,\n\t\t\t\t\t\t\t\tstdout: stdout.toString(),\n\t\t\t\t\t\t\t\tstderr: stderr.toString()\n\t\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\t\tif (error) {\n\t\t\t\t\t\t\t\tcallback.call(scope, false);\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tcallback.call(scope, true);\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t} catch (err) {\n\n\t\t\t\t\t\tcallback.call(scope, false);\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\ttrace: function(limit) {\n\n\t\t\tlimit = typeof limit === 'number' ? (limit | 0) : null;\n\n\n\t\t\tlet stack = this.__stack;\n\t\t\tif (limit !== null) {\n\t\t\t\tstack = stack.slice(stack.length - limit, limit);\n\t\t\t}\n\n\n\t\t\tstack.forEach(function(context) {\n\n\t\t\t\tlet dir = context.path;\n\t\t\t\tlet cmd = context.file;\n\t\t\t\tlet out = context.stdout.trim();\n\t\t\t\tlet err = context.stderr.trim();\n\n\t\t\t\tif (cmd.substr(0, dir.length) === dir) {\n\t\t\t\t\tcmd = '.' + cmd.substr(dir.length);\n\t\t\t\t}\n\n\t\t\t\tif (context.args.length > 0) {\n\t\t\t\t\tcmd += ' ';\n\t\t\t\t\tcmd += context.args.join(' ');\n\t\t\t\t}\n\n\t\t\t\tconsole.log('');\n\t\t\t\tconsole.log('cd ' + dir + ';');\n\t\t\t\tconsole.log(cmd + ';');\n\t\t\t\tconsole.log('');\n\n\t\t\t\tif (out.length > 0) {\n\t\t\t\t\tconsole.log(out);\n\t\t\t\t}\n\n\t\t\t\tif (err.length > 0) {\n\t\t\t\t\tconsole.error(err);\n\t\t\t\t}\n\n\t\t\t\tconsole.log('');\n\n\t\t\t});\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html.Application"],"blob":{"attaches":{"appcache.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.appcache.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Q0FDSEUgTUFOSUZFU1QKCkNBQ0hFOgovZmF2aWNvbi5pY28KY29yZS5qcwppY29uLnBuZwppbmRleC5odG1sCm1hbmlmZXN0Lmpzb24KCk5FVFdPUks6Ci9hcGkKaHR0cDovL2hhcnZlc3Rlci5hcnRpZmljaWFsLmVuZ2luZWVyaW5nOjQ4NDgKaHR0cDovL2xvY2FsaG9zdDo0ODQ4Cgo="}},"config.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.config.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,ewoJInNob3J0X25hbWUiOiAgIiR7aWR9IiwKCSJuYW1lIjogICAgICAgICIke2lkfSAocG93ZXJlZCBieSBseWNoZWUuanMpIiwKCSJ2ZXJzaW9uIjogICAgICIke3ZlcnNpb259IiwKCSJkaXNwbGF5IjogICAgICJzdGFuZGFsb25lIiwKCSJvcmllbnRhdGlvbiI6ICJsYW5kc2NhcGUiLAoJImljb25zIjogW3sKCQkic3JjIjogICAiaWNvbi5wbmciLAoJCSJzaXplcyI6ICIxMjh4MTI4IiwKCQkidHlwZSI6ICAiaW1hZ2UvcG5nIgoJfV0sCgkic3RhcnRfdXJsIjogICAgICAgICJpbmRleC5odG1sIiwKCSJ0aGVtZV9jb2xvciI6ICAgICAgIiMyZjM3MzYiLAoJImJhY2tncm91bmRfY29sb3IiOiAiIzQwNTA1MCIKfQoK"}},"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sIG1hbmlmZXN0PSJpbmRleC5hcHBjYWNoZSI+CjxoZWFkPgoJPG1ldGEgY2hhcnNldD0idXRmLTgiPgoJPHRpdGxlPiR7aWR9PC90aXRsZT4KCgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+Cgk8bGluayByZWw9Im1hbmlmZXN0IiBocmVmPSIuL21hbmlmZXN0Lmpzb24iPgoJPGxpbmsgcmVsPSJpY29uIiBocmVmPSIuL2ljb24ucG5nIiBzaXplcz0iMTI4eDEyOCIgdHlwZT0iaW1hZ2UvcG5nIj4KCgk8c2NyaXB0IHNyYz0iLi9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlci1jYW52YXMgewoJCQlkaXNwbGF5OiBibG9jazsKCQkJbWFyZ2luOiAwIGF1dG87CgkJCXVzZXItc2VsZWN0OiBub25lOwoJCQktbW96LXVzZXItc2VsZWN0OiBub25lOwoJCQktbXMtdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS13ZWJraXQtdXNlci1zZWxlY3Q6IG5vbmU7CgkJfQoJPC9zdHlsZT4KCjwvaGVhZD4KPGJvZHk+CjxzY3JpcHQ+CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWx5Y2hlZS5lbnZpbml0KGVudmlyb25tZW50LCAke3Byb2ZpbGV9KTsKCX0KCn0pKGx5Y2hlZSwgdHlwZW9mIGdsb2JhbCAhPT0gJ3VuZGVmaW5lZCcgPyBnbG9iYWwgOiB0aGlzKTsKPC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tconfig:   attachments[\"config.tpl\"],\n\t\tappcache: attachments[\"appcache.tpl\"],\n\t\tcore:     null,\n\t\ticon:     attachments[\"icon.png\"],\n\t\tindex:    attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__appcache = lychee.deserialize(lychee.serialize(_TEMPLATES.appcache));\n\t\tthis.__config   = lychee.deserialize(lychee.serialize(_TEMPLATES.config));\n\t\tthis.__core     = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon     = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index    = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\n\t\t\tlet that   = this;\n\t\t\tlet load   = 3;\n\t\t\tlet config = this.stash.read('./manifest.json');\n\t\t\tlet core   = this.stash.read('/libraries/lychee/build/html/core.js');\n\t\t\tlet icon   = this.stash.read('./icon.png');\n\n\t\t\tif (config !== null) {\n\n\t\t\t\tconfig.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__config = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tconfig.load();\n\n\t\t\t}\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (config === null && core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox  = this.sandbox;\n\t\t\t\tlet appcache = this.__appcache;\n\t\t\t\tlet config   = this.__config;\n\t\t\t\tlet core     = this.__core;\n\t\t\t\tlet icon     = this.__icon;\n\t\t\t\tlet index    = this.__index;\n\n\n\t\t\t\tif (!(config instanceof Config)) {\n\n\t\t\t\t\tconfig        = new Config();\n\t\t\t\t\tconfig.buffer = JSON.parse(_TEMPLATES.config.buffer.replaceObject({\n\t\t\t\t\t\tdebug:   env.debug,\n\t\t\t\t\t\tid:      env.id,\n\t\t\t\t\t\tversion: lychee.VERSION\n\t\t\t\t\t}));\n\n\t\t\t\t}\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/manifest.json',  config);\n\t\t\t\tstash.write(sandbox + '/core.js',        core);\n\t\t\t\tstash.write(sandbox + '/icon.png',       icon);\n\t\t\t\tstash.write(sandbox + '/index.appcache', appcache);\n\t\t\t\tstash.write(sandbox + '/index.html',     index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.Template":{"constructor":"lychee.Definition","arguments":["fertilizer.Template"],"blob":{"attaches":{},"requires":["lychee.Stash","fertilizer.data.Shell"],"includes":["lychee.event.Flow"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Flow  = lychee.import('lychee.event.Flow');\n\tconst _Stash = lychee.import('lychee.Stash');\n\tconst _Shell = lychee.import('fertilizer.data.Shell');\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.environment = null;\n\t\tthis.sandbox     = '';\n\t\tthis.settings    = {};\n\t\tthis.profile     = null;\n\t\tthis.shell       = new _Shell();\n\t\tthis.stash       = new _Stash({\n\t\t\ttype: _Stash.TYPE.persistent\n\t\t});\n\n\n\t\tthis.setEnvironment(settings.environment);\n\t\tthis.setProfile(settings.profile);\n\t\tthis.setSandbox(settings.sandbox);\n\t\tthis.setSettings(settings.settings);\n\n\n\t\t_Flow.call(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tlet environment = lychee.deserialize(blob.environment);\n\t\t\tlet shell       = lychee.deserialize(blob.shell);\n\t\t\tlet stash       = lychee.deserialize(blob.stash);\n\n\t\t\tif (environment !== null) {\n\t\t\t\tthis.setEnvironment(environment);\n\t\t\t}\n\n\t\t\tif (shell !== null) {\n\t\t\t\tthis.shell = shell;\n\t\t\t}\n\n\t\t\tif (stash !== null) {\n\t\t\t\tthis.stash = stash;\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Flow.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.Template';\n\n\n\t\t\tlet settings = data['arguments'][0] || {};\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tif (this.profile !== null)                 settings.profile  = this.profile;\n\t\t\tif (this.sandbox !== '')                   settings.sandbox  = this.sandbox;\n\t\t\tif (Object.keys(this.settings).length > 0) settings.settings = this.settings;\n\n\n\t\t\tif (this.environment !== null) blob.environment = lychee.serialize(this.environment);\n\t\t\tif (this.shell !== null)       blob.shell       = lychee.serialize(this.shell);\n\t\t\tif (this.stash !== null)       blob.stash       = lychee.serialize(this.stash);\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetEnvironment: function(environment) {\n\n\t\t\tenvironment = environment instanceof lychee.Environment ? environment : null;\n\n\n\t\t\tif (environment !== null) {\n\n\t\t\t\tthis.environment = environment;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetProfile: function(profile) {\n\n\t\t\tprofile = profile instanceof Object ? profile : null;\n\n\n\t\t\tif (profile !== null) {\n\n\t\t\t\tthis.profile = profile;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSandbox: function(sandbox) {\n\n\t\t\tsandbox = typeof sandbox === 'string' ? sandbox : null;\n\n\n\t\t\tif (sandbox !== null) {\n\n\t\t\t\tthis.sandbox = sandbox;\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSettings: function(settings) {\n\n\t\t\tsettings = settings instanceof Object ? settings : null;\n\n\n\t\t\tif (settings !== null) {\n\n\t\t\t\tthis.settings = settings;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-nwjs.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-nwjs.Application"],"blob":{"attaches":{"config.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.config.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,ewoJIm1haW4iOiAgICAgICAgICIuL2luZGV4Lmh0bWwiLAoJIm5hbWUiOiAgICAgICAgICIke2lkfSIsCgkiZGVzY3JpcHRpb24iOiAgIiR7aWR9IChwb3dlcmVkIGJ5IGx5Y2hlZS5qcykiLAoJInZlcnNpb24iOiAgICAgICIke3ZlcnNpb259IiwKCSJ3aW5kb3ciOiB7CgkJInRpdGxlIjogICAgIiR7aWR9IChwb3dlcmVkIGJ5IGx5Y2hlZS5qcykiLAoJCSJpY29uIjogICAgICIuL2ljb24ucG5nIiwKCQkidG9vbGJhciI6ICAke2RlYnVnfSwKCQkiZnJhbWUiOiAgICB0cnVlLAoJCSJ3aWR0aCI6ICAgIDY0MCwKCQkiaGVpZ2h0IjogICA0ODAsCgkJInBvc2l0aW9uIjogImNlbnRlciIKCX0sCgkid2Via2l0IjogewoJCSJwbHVnaW4iOiBmYWxzZQoJfQp9Cg=="}},"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIEh0bWw+CjxodG1sPgo8aGVhZD4KCTxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KCTx0aXRsZT4ke2lkfTwvdGl0bGU+CgoJPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLCBtaW5pbXVtLXNjYWxlPTEsIG1heGltdW0tc2NhbGU9MSwgdXNlci1zY2FsYWJsZT1ubyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1jYXBhYmxlIiBjb250ZW50PSJ5ZXMiPgoJPG1ldGEgbmFtZT0iYXBwbGUtbW9iaWxlLXdlYi1hcHAtc3RhdHVzLWJhci1zdHlsZSIgY29udGVudD0iYmxhY2stdHJhbnNsdWNlbnQiPgoJPG1ldGEgaHR0cC1lcXVpdj0iWC1VQS1Db21wYXRpYmxlIiBjb250ZW50PSJJRT1lZGdlIiAvPgoJPGxpbmsgcmVsPSJpY29uIiBocmVmPSIuL2ljb24ucG5nIiBzaXplcz0iMTI4eDEyOCIgdHlwZT0iaW1hZ2UvcG5nIj4KCgk8c2NyaXB0IHNyYz0iLi9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlci1jYW52YXMgewoJCQlkaXNwbGF5OiBibG9jazsKCQkJbWFyZ2luOiAwIGF1dG87CgkJCXVzZXItc2VsZWN0OiBub25lOwoJCQktbW96LXVzZXItc2VsZWN0OiBub25lOwoJCQktbXMtdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS13ZWJraXQtdXNlci1zZWxlY3Q6IG5vbmU7CgkJfSAKCTwvc3R5bGU+Cgo8L2hlYWQ+Cjxib2R5Pgo8c2NyaXB0PgooZnVuY3Rpb24obHljaGVlLCBnbG9iYWwpIHsKCglsZXQgZW52aXJvbm1lbnQgPSBseWNoZWUuZGVzZXJpYWxpemUoJHtibG9ifSk7CglpZiAoZW52aXJvbm1lbnQgIT09IG51bGwpIHsKCQlseWNoZWUuZW52aW5pdChlbnZpcm9ubWVudCwgJHtwcm9maWxlfSk7Cgl9Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4K"}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tconfig: attachments[\"config.tpl\"],\n\t\tcore:   null,\n\t\ticon:   attachments[\"icon.png\"],\n\t\tindex:  attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__config = lychee.deserialize(lychee.serialize(_TEMPLATES.config));\n\t\tthis.__core   = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon   = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index  = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\t\t\tlet that   = this;\n\t\t\tlet load   = 3;\n\t\t\tlet config = this.stash.read('./package.json');\n\t\t\tlet core   = this.stash.read('/libraries/lychee/build/html-nwjs/core.js');\n\t\t\tlet icon   = this.stash.read('./icon.png');\n\n\t\t\tif (config !== null) {\n\n\t\t\t\tconfig.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__config = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tconfig.load();\n\n\t\t\t}\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (config === null && core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet config  = this.__config;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet icon    = this.__icon;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tif (!(config instanceof Config)) {\n\n\t\t\t\t\tconfig = new Config();\n\t\t\t\t\tconfig.buffer = JSON.parse(_TEMPLATES.config.buffer.replaceObject({\n\t\t\t\t\t\tdebug:   env.debug,\n\t\t\t\t\t\tid:      env.id,\n\t\t\t\t\t\tversion: lychee.VERSION\n\t\t\t\t\t}));\n\n\t\t\t\t}\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/package.json', config);\n\t\t\t\tstash.write(sandbox + '/core.js',      core);\n\t\t\t\tstash.write(sandbox + '/icon.png',     icon);\n\t\t\t\tstash.write(sandbox + '/index.html',   index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/html-nwjs/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-nwjs.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-nwjs.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-nwjs.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-nwjs/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-nwjs.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-webview.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-webview.Application"],"blob":{"attaches":{"icon.png":{"constructor":"Texture","arguments":["/libraries/fertilizer/source/template/html-webview/Application.icon.png"],"blob":{"buffer":"data:image/png;base64,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/NmwGoA9e/agqqpqIoB/FvlY/jEALZZlLfH7/buAD0+wKSVlAPYFHtm27QMwyxjzrwBmAji4iF/tUmb+3bAYANu2EY/HR1uW9TaA6iIS0i4ATwNYZYxZHgwG3wCALVu2YOLEiaodZUjfyM1wODyaiOYikZH6LBReCrFMzGbmJ3JqAGzbhuM4lUS0G0ChD4ZfIaIV8Xh8eVVV1YqampoeVXglk2c7evToff8Oh8NTiWg2gFlIxFwUdBCWMeakYDABSBYPAAACRUlEQVS4NicGIBKJoK2tzaqvr38bwDgUzpkCDoAXAKwiopcdx3kxGAxu7SMUna1XskIkEvHH4/FTieg0AB9DYifniAJ7zCOj0eibbgOFXGlGnzjsVgCT8/hy7QBeRmKGfjURvRwIBN5WZVfyOIwYaYyZAuDkPp98prfvATDWGNPhJho1o7b02b++HMCcYXqJrQBeAbAh+WlNrb8rSjEQDoePIqITARyLRHLYRgxfkti2WCw23uv1vpdpt6Wr7jJH5+DtRiIl+AYi2myM2WiMeS0YDG46kAFSlBLxGCYCOM4Yc3TSUzgaif0ch2b5VhuY+SOZtqiTC+X/dwC3D6En34xEHPkbRPSG4zibUjPwKXKxzVFRCpkDBZWJSAOAI40xRxHRkQCOBHAEElvCA4O4zRPMPDtdJ0oZ3JiZRHSgpYVuADuRSOC4FcBWItrqOM5bALb0nYTrM4Gi6+uK4oL+FDYcDo9OGoNDieiwpNcwMelJjAVwIH//Dmb+0qA8gOTpt+8YY7ZblrXTGLOTmSNaRYpSmDiOUyEi4yzLGktE44wxhwP4HTNrIlpFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURRFURSlqPg/8yAgOX81704AAAAASUVORK5CYII="}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-webview/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KCTx0aXRsZT4ke2lkfTwvdGl0bGU+Cgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+CgoJPHNjcmlwdCBzcmM9Ii4vY29yZS5qcyI+PC9zY3JpcHQ+CgoJPHN0eWxlPgoJCWJvZHkgewoJCQltYXJnaW46IDA7CgkJCXBhZGRpbmc6IDA7CgkJfQoJCQoJCS5seWNoZWUtUmVuZGVyZXItY2FudmFzIHsKCQkJZGlzcGxheTogYmxvY2s7CgkJCW1hcmdpbjogMCBhdXRvOwoJCQl1c2VyLXNlbGVjdDogbm9uZTsKCQkJLW1vei11c2VyLXNlbGVjdDogbm9uZTsKCQkJLW1zLXVzZXItc2VsZWN0OiBub25lOwoJCQktd2Via2l0LXVzZXItc2VsZWN0OiBub25lOwoJCX0gCgk8L3N0eWxlPgoKPC9oZWFkPgo8Ym9keT4KPHNjcmlwdD4KKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbGV0IGVudmlyb25tZW50ID0gbHljaGVlLmRlc2VyaWFsaXplKCR7YmxvYn0pOwoJaWYgKGVudmlyb25tZW50ICE9PSBudWxsKSB7CgkJbHljaGVlLmVudmluaXQoZW52aXJvbm1lbnQsICR7cHJvZmlsZX0pOwoJfQoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwo8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+Cg=="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tcore:  null,\n\t\ticon:  attachments[\"icon.png\"],\n\t\tindex: attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__core  = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__icon  = lychee.deserialize(lychee.serialize(_TEMPLATES.icon));\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\t\t\tlet that = this;\n\t\t\tlet load = 2;\n\t\t\tlet core = this.stash.read('/libraries/lychee/build/html-webview/core.js');\n\t\t\tlet icon = this.stash.read('./icon.png');\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\t\t\tif (icon !== null) {\n\n\t\t\t\ticon.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__icon = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\ticon.load();\n\n\t\t\t}\n\n\n\t\t\tif (core === null && icon === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet icon    = this.__icon;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/core.js',    core);\n\t\t\t\tstash.write(sandbox + '/icon.png',   icon);\n\t\t\t\tstash.write(sandbox + '/index.html', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/html-webview/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-webview.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.html-webview.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.html-webview.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/html-webview/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.html-webview.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.node.Application":{"constructor":"lychee.Definition","arguments":["fertilizer.template.node.Application"],"blob":{"attaches":{"index.tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/node/Application.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CnJlcXVpcmUoJy4vY29yZS5qcycpKF9fZGlybmFtZSk7CgoKKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbGV0IGVudmlyb25tZW50ID0gbHljaGVlLmRlc2VyaWFsaXplKCR7YmxvYn0pOwoJaWYgKGVudmlyb25tZW50ICE9PSBudWxsKSB7CgkJbHljaGVlLmVudmluaXQoZW52aXJvbm1lbnQsICR7cHJvZmlsZX0pOwoJfQoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwoK"}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template  = lychee.import('fertilizer.Template');\n\tconst _TEMPLATES = {\n\t\tcore:  null,\n\t\tindex: attachments[\"index.tpl\"]\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__core  = lychee.deserialize(lychee.serialize(_TEMPLATES.core));\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATES.index));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\n\n\t\t\tlet that = this;\n\t\t\tlet load = 1;\n\t\t\tlet core = this.stash.read('/libraries/lychee/build/node/core.js');\n\n\t\t\tif (core !== null) {\n\n\t\t\t\tcore.onload = function(result) {\n\n\t\t\t\t\tif (result === true) {\n\t\t\t\t\t\tthat.__core = this;\n\t\t\t\t\t}\n\n\t\t\t\t\tif ((--load) === 0) {\n\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t}\n\n\t\t\t\t};\n\n\t\t\t\tcore.load();\n\n\t\t\t}\n\n\n\t\t\tif (core === null) {\n\t\t\t\toncomplete(false);\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet core    = this.__core;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob:    env.serialize(),\n\t\t\t\t\tid:      env.id,\n\t\t\t\t\tprofile: this.profile\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/core.js',  core);\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\n\t\t\tlet name    = this.environment.id.split('/')[2];\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet shell   = this.shell;\n\n\t\t\tif (name === 'cultivator') {\n\t\t\t\tname = this.environment.id.split('/')[3];\n\t\t\t}\n\n\n\t\t\tif (sandbox !== '') {\n\n\t\t\t\tconsole.log('fertilizer: PACKAGE ' + sandbox + ' ' + name);\n\n\n\t\t\t\tshell.exec('/bin/runtime/node/package.sh ' + sandbox + ' ' + name, function(result) {\n\n\t\t\t\t\tif (result === true) {\n\n\t\t\t\t\t\toncomplete(true);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\tshell.trace();\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t});\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.node.Application';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"fertilizer.template.node.Library":{"constructor":"lychee.Definition","arguments":["fertilizer.template.node.Library"],"blob":{"attaches":{"tpl":{"constructor":"Stuff","arguments":["/libraries/fertilizer/source/template/node/Library.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,CihmdW5jdGlvbihseWNoZWUsIGdsb2JhbCkgewoKCWxldCBlbnZpcm9ubWVudCA9IGx5Y2hlZS5kZXNlcmlhbGl6ZSgke2Jsb2J9KTsKCWlmIChlbnZpcm9ubWVudCAhPT0gbnVsbCkgewoJCWVudmlyb25tZW50LmluaXQoKTsKCX0KCglseWNoZWUuRU5WSVJPTk1FTlRTWycke2lkfSddID0gZW52aXJvbm1lbnQ7Cgp9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgo="}}},"includes":["fertilizer.Template"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Template = lychee.import('fertilizer.Template');\n\tconst _TEMPLATE = attachments[\"tpl\"];\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\t_Template.call(this, data);\n\n\n\t\tthis.__index = lychee.deserialize(lychee.serialize(_TEMPLATE));\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('configure', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: CONFIGURE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t\tthis.bind('build', function(oncomplete) {\n\n\t\t\tlet env   = this.environment;\n\t\t\tlet stash = this.stash;\n\n\t\t\tif (env !== null && stash !== null) {\n\n\t\t\t\tconsole.log('fertilizer: BUILD ' + env.id);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\t\t\t\tlet index   = this.__index;\n\n\n\t\t\t\tindex.buffer = index.buffer.replaceObject({\n\t\t\t\t\tblob: env.serialize(),\n\t\t\t\t\tid:   env.id\n\t\t\t\t});\n\n\n\t\t\t\tstash.write(sandbox + '/index.js', index);\n\n\n\t\t\t\toncomplete(true);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('package', function(oncomplete) {\n\t\t\tconsole.log('fertilizer: PACKAGE');\n\t\t\toncomplete(true);\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Template.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'fertilizer.template.node.Library';\n\n\n\t\t\treturn data;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Flow":{"constructor":"lychee.Definition","arguments":["lychee.event.Flow"],"blob":{"attaches":{},"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Emitter = lychee.import('lychee.event.Emitter');\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_recursive = function(event, result) {\n\n\t\tif (result === true) {\n\n\t\t\tif (this.___timeout === null) {\n\n\t\t\t\tthis.___timeout = setTimeout(function() {\n\n\t\t\t\t\tthis.___timeout = null;\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t}.bind(this), 0);\n\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('error', [ event ]);\n\n\t\t}\n\n\t};\n\n\tconst _process_stack = function() {\n\n\t\tlet entry = this.___stack.shift() || null;\n\t\tif (entry !== null) {\n\n\t\t\tlet data  = entry.data;\n\t\t\tlet event = entry.event;\n\t\t\tlet args  = [ event, [] ];\n\n\t\t\tif (data !== null) {\n\t\t\t\targs[1].push.apply(args[1], data);\n\t\t\t}\n\n\t\t\targs[1].push(_process_recursive.bind(this, event));\n\n\n\t\t\tlet result = this.trigger.apply(this, args);\n\t\t\tif (result === false) {\n\t\t\t\tthis.trigger('error', [ event ]);\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('complete');\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___init    = false;\n\t\tthis.___stack   = [];\n\t\tthis.___timeout = null;\n\n\t\t_Emitter.call(this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.event.Flow';\n\n\t\t\tlet blob = (data['blob'] || {});\n\n\n\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\tblob.stack = [];\n\n\t\t\t\tfor (let s = 0, sl = this.___stack.length; s < sl; s++) {\n\n\t\t\t\t\tlet entry = this.___stack[s];\n\n\t\t\t\t\tblob.stack.push({\n\t\t\t\t\t\tevent: entry.event,\n\t\t\t\t\t\tdata:  lychee.serialize(entry.data)\n\t\t\t\t\t});\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['blob'] = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tthen: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tif (event !== null) {\n\n\t\t\t\tthis.___stack.push({\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  data\n\t\t\t\t});\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tinit: function() {\n\n\t\t\tif (this.___init === false) {\n\n\t\t\t\tthis.___init = true;\n\n\n\t\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Stash":{"constructor":"lychee.Definition","arguments":["lychee.Stash"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('fs');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tlet   _id         = 0;\n\tconst _Emitter    = lychee.import('lychee.event.Emitter');\n\tconst _PERSISTENT = {\n\t\tdata: {},\n\t\tread: function() {\n\t\t\treturn null;\n\t\t},\n\t\twrite: function(id, asset) {\n\t\t\treturn false;\n\t\t}\n\t};\n\tconst _TEMPORARY  = {\n\t\tdata: {},\n\t\tread: function() {\n\n\t\t\tif (Object.keys(this.data).length > 0) {\n\t\t\t\treturn this.data;\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\t\twrite: function(id, asset) {\n\n\t\t\tif (asset !== null) {\n\t\t\t\tthis.data[id] = asset;\n\t\t\t} else {\n\t\t\t\tdelete this.data[id];\n\t\t\t}\n\n\t\t\treturn true;\n\n\t\t}\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tconst _ENCODING = {\n\t\t\t'Config':  'utf8',\n\t\t\t'Font':    'utf8',\n\t\t\t'Music':   'binary',\n\t\t\t'Sound':   'binary',\n\t\t\t'Texture': 'binary',\n\t\t\t'Stuff':   'utf8'\n\t\t};\n\n\n\t\tconst _fs      = global.require('fs');\n\t\tconst _path    = global.require('path');\n\t\tconst _mkdir_p = function(path, mode) {\n\n\t\t\tif (mode === undefined) {\n\t\t\t\tmode = 0o777 & (~process.umask());\n\t\t\t}\n\n\n\t\t\tlet is_directory = false;\n\n\t\t\ttry {\n\n\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\n\t\t\t} catch (err) {\n\n\t\t\t\tif (err.code === 'ENOENT') {\n\n\t\t\t\t\tif (_mkdir_p(_path.dirname(path), mode) === true) {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.mkdirSync(path, mode);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\ttry {\n\t\t\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\t\t\t\t\t} catch (err) {\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn is_directory;\n\n\t\t};\n\n\n\t\tlet unlink = 'unlinkSync' in _fs;\n\t\tlet write  = 'writeFileSync' in _fs;\n\t\tif (unlink === true && write === true) {\n\n\t\t\t_PERSISTENT.write = function(id, asset) {\n\n\t\t\t\tlet result = false;\n\n\n\t\t\t\tlet path = lychee.environment.resolve(id);\n\t\t\t\tif (path.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\n\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\tlet dir = path.split('/').slice(0, -1).join('/');\n\t\t\t\t\t\tif (dir.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\t\t\t\t\t\t\t_mkdir_p(dir);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tlet data = lychee.serialize(asset);\n\t\t\t\t\t\tif (data !== null && data.blob !== null && typeof data.blob.buffer === 'string') {\n\n\t\t\t\t\t\t\tlet encoding = _ENCODING[data.constructor] || _ENCODING['Stuff'];\n\t\t\t\t\t\t\tlet index    = data.blob.buffer.indexOf('base64,') + 7;\n\t\t\t\t\t\t\tif (index > 7) {\n\n\t\t\t\t\t\t\t\tlet buffer = new Buffer(data.blob.buffer.substr(index, data.blob.buffer.length - index), 'base64');\n\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\t_fs.writeFileSync(path, buffer, encoding);\n\t\t\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.unlinkSync(path);\n\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\treturn result;\n\n\t\t\t};\n\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (write && unlink) methods.push('Persistent');\n\t\t\tif (_TEMPORARY)      methods.push('Temporary');\n\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Stash: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Stash: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _validate_asset = function(asset) {\n\n\t\tif (asset instanceof Object && typeof asset.serialize === 'function') {\n\t\t\treturn true;\n\t\t}\n\n\t\treturn false;\n\n\t};\n\n\tconst _on_batch_remove = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(null);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'remove', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_remove);\n\t\t}\n\n\t};\n\n\tconst _on_batch_write = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(others[key]);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'write', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_write);\n\t\t}\n\n\t};\n\n\tconst _read_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet blob = null;\n\n\n\t\tlet type = this.type;\n\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\tblob = _PERSISTENT.read();\n\n\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\tblob = _TEMPORARY.read();\n\n\t\t}\n\n\n\t\tif (blob !== null) {\n\n\t\t\tif (Object.keys(this.__assets).length !== Object.keys(blob).length) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob) {\n\t\t\t\t\tthis.__assets[id] = blob[id];\n\t\t\t\t}\n\n\n\t\t\t\tif (silent === false) {\n\t\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _write_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet operations = this.__operations;\n\t\tlet filtered   = {};\n\n\t\tif (operations.length !== 0) {\n\n\t\t\twhile (operations.length > 0) {\n\n\t\t\t\tlet operation = operations.shift();\n\t\t\t\tif (operation.type === 'update') {\n\n\t\t\t\t\tfiltered[operation.id] = operation.asset;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== operation.asset) {\n\t\t\t\t\t\tthis.__assets[operation.id] = operation.asset;\n\t\t\t\t\t}\n\n\t\t\t\t} else if (operation.type === 'remove') {\n\n\t\t\t\t\tfiltered[operation.id] = null;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== null) {\n\t\t\t\t\t\tthis.__assets[operation.id] = null;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tlet type = this.type;\n\t\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_PERSISTENT.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_TEMPORARY.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (silent === false) {\n\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.id   = 'lychee-Stash-' + _id++;\n\t\tthis.type = Composite.TYPE.persistent;\n\n\n\t\tthis.__assets     = {};\n\t\tthis.__operations = [];\n\n\n\t\tthis.setId(settings.id);\n\t\tthis.setType(settings.type);\n\n\n\t\t_Emitter.call(this);\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\t_read_stash.call(this);\n\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.TYPE = {\n\t\tpersistent: 0,\n\t\ttemporary:  1\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tsync: function(silent) {\n\n\t\t\tsilent = silent === true;\n\n\n\t\t\tlet result = false;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'sync'\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\tif (this.__operations.length > 0) {\n\t\t\t\tresult = _write_stash.call(this, silent);\n\t\t\t} else {\n\t\t\t\tresult = _read_stash.call(this, silent);\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.assets instanceof Object) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob.assets) {\n\t\t\t\t\tthis.__assets[id] = lychee.deserialize(blob.assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Stash';\n\n\t\t\tlet settings = {};\n\t\t\tlet blob     = (data['blob'] || {});\n\n\n\t\t\tif (this.id.substr(0, 13) !== 'lychee-Stash-') settings.id   = this.id;\n\t\t\tif (this.type !== Composite.TYPE.persistent)   settings.type = this.type;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tblob.assets = {};\n\n\t\t\t\tfor (let id in this.__assets) {\n\t\t\t\t\tblob.assets[id] = lychee.serialize(this.__assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbatch: function(action, ids, assets) {\n\n\t\t\taction = typeof action === 'string' ? action : null;\n\t\t\tids    = ids instanceof Array       ? ids    : null;\n\t\t\tassets = assets instanceof Array    ? assets : null;\n\n\n\t\t\tif (action !== null) {\n\n\t\t\t\tlet cache  = {\n\t\t\t\t\tload:  [].slice.call(ids),\n\t\t\t\t\tready: []\n\t\t\t\t};\n\n\n\t\t\t\tlet result = true;\n\t\t\t\tlet that   = this;\n\n\t\t\t\tif (action === 'read') {\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tlet asset = this.read(ids[i]);\n\t\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\t\tasset.onload = function(result) {\n\n\t\t\t\t\t\t\t\tlet index = cache.load.indexOf(this.url);\n\t\t\t\t\t\t\t\tif (index !== -1) {\n\t\t\t\t\t\t\t\t\tcache.ready.push(this);\n\t\t\t\t\t\t\t\t\tcache.load.splice(index, 1);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\tif (cache.load.length === 0) {\n\t\t\t\t\t\t\t\t\tthat.trigger('batch', [ 'read', cache.ready ]);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\tasset.load();\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tresult = false;\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'remove') {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_remove, cache);\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tif (this.remove(ids[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_remove);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'write' && ids.length === assets.length) {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_write, cache);\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tif (this.write(ids[i], assets[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_write);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tread: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tlet asset = new lychee.Asset(id, null, true);\n\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\tthis.__assets[id] = asset;\n\n\t\t\t\t\treturn asset;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tremove: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'remove',\n\t\t\t\t\tid:   id\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\twrite: function(id, asset) {\n\n\t\t\tid    = typeof id === 'string'          ? id    : null;\n\t\t\tasset = _validate_asset(asset) === true ? asset : null;\n\n\n\t\t\tif (id !== null && asset !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype:  'update',\n\t\t\t\t\tid:    id,\n\t\t\t\t\tasset: asset\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetId: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.id = id;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetType: function(type) {\n\n\t\t\ttype = lychee.enumof(Composite.TYPE, type) ? type : null;\n\n\n\t\t\tif (type !== null) {\n\n\t\t\t\tthis.type = type;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}}},"features":{"process":{"stdin":{"on":"function"}},"require":"function"}}});
 	if (environment !== null) {
 		environment.init();
 	}

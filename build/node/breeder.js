@@ -420,7 +420,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 			lychee:  '/opt/lycheejs',
 			project: null
 		},
-		VERSION:      "2017-Q1",
+		VERSION:      "2017-Q2",
 
 
 
@@ -430,40 +430,50 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 
 		diff: function(aobject, bobject) {
 
-			let akeys = Object.keys(aobject);
-			let bkeys = Object.keys(bobject);
+			if (aobject instanceof Object && bobject instanceof Object) {
 
-			if (akeys.length !== bkeys.length) {
-				return true;
-			}
+				let akeys = Object.keys(aobject);
+				let bkeys = Object.keys(bobject);
+
+				if (akeys.length !== bkeys.length) {
+					return true;
+				}
 
 
-			for (let a = 0, al = akeys.length; a < al; a++) {
+				for (let a = 0, al = akeys.length; a < al; a++) {
 
-				let key = akeys[a];
+					let key = akeys[a];
 
-				if (bobject[key] !== undefined) {
+					if (bobject[key] !== undefined) {
 
-					if (aobject[key] !== null && bobject[key] !== null) {
+						if (aobject[key] !== null && bobject[key] !== null) {
 
-						if (aobject[key] instanceof Object && bobject[key] instanceof Object) {
+							if (aobject[key] instanceof Object && bobject[key] instanceof Object) {
 
-							if (lychee.diff(aobject[key], bobject[key]) === true) {
+								if (lychee.diff(aobject[key], bobject[key]) === true) {
 
-								// Allows aobject[key].builds = {} and bobject[key].builds = { stuff: {}}
-								if (Object.keys(aobject[key]).length > 0) {
-									return true;
+									// Allows aobject[key].builds = {} and bobject[key].builds = { stuff: {}}
+									if (Object.keys(aobject[key]).length > 0) {
+										return true;
+									}
+
 								}
 
+							} else if (typeof aobject[key] !== typeof bobject[key]) {
+								return true;
 							}
 
-						} else if (typeof aobject[key] !== typeof bobject[key]) {
-							return true;
 						}
 
+					} else {
+						return true;
 					}
 
-				} else {
+				}
+
+			} else {
+
+				if (aobject !== bobject) {
 					return true;
 				}
 
@@ -919,7 +929,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 				definition.exports = function(callback) {
 
 					lychee.Definition.prototype.exports.call(this, callback);
-					that.environment.define(this);
+					that.environment.define(this, false);
 
 				};
 
@@ -1013,7 +1023,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 				if (_environment !== null) {
 
 					Object.values(_environment.definitions).forEach(function(definition) {
-						environment.define(definition);
+						environment.define(definition, true);
 					});
 
 				}
@@ -1088,7 +1098,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 								if (_environment !== null) {
 
 									Object.values(_environment.definitions).forEach(function(definition) {
-										environment.define(definition);
+										environment.define(definition, true);
 									});
 
 								}
@@ -1162,7 +1172,7 @@ lychee = typeof lychee !== 'undefined' ? lychee : (function(global) {
 					let that = this;
 
 					Object.values(environment.definitions).forEach(function(definition) {
-						that.environment.define(definition);
+						that.environment.define(definition, true);
 					});
 
 					let build_old = this.environment.definitions[this.environment.build] || null;
@@ -1233,8 +1243,8 @@ lychee.Asset = typeof lychee.Asset !== 'undefined' ? lychee.Asset : (function(gl
 		let construct = null;
 
 
-		if (type === 'json')  construct = global.Config;
 		if (type === 'fnt')   construct = global.Font;
+		if (type === 'json')  construct = global.Config;
 		if (type === 'msc')   construct = global.Music;
 		if (type === 'pkg')   construct = global.Config;
 		if (type === 'png')   construct = global.Texture;
@@ -1379,7 +1389,9 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 
 	const _report_error = function(environment, data) {
 
+		let info = 'Report from ' + data.file + '#L' + data.line + ' in ' + data.method;
 		let main = environment.global.MAIN || null;
+
 		if (main !== null) {
 
 			let client = main.client || null;
@@ -1387,7 +1399,7 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 
 				let service = client.getService('debugger');
 				if (service !== null) {
-					service.report('lychee.Debugger: Report from ' + data.file + '#L' + data.line + ' in ' + data.method + '', data);
+					service.report('lychee.Debugger: ' + info, data);
 				}
 
 			}
@@ -1395,8 +1407,8 @@ lychee.Debugger = typeof lychee.Debugger !== 'undefined' ? lychee.Debugger : (fu
 		}
 
 
-		console.error('lychee.Debugger: Report from ' + data.file + '#L' + data.line + ' in ' + data.method + '');
-		console.error('lychee.Debugger:             ' + data.definition + ' - "' + data.message + '"');
+		console.error('lychee.Debugger: ' + info);
+		console.error('lychee.Debugger: ' + data.message.trim());
 
 	};
 
@@ -1653,6 +1665,7 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 
 			if (pkg !== null) {
 
+				let id    = '';
 				let tmp_i = ns.indexOf('source');
 				let tmp_s = ns[ns.length - 1];
 
@@ -1660,15 +1673,12 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 					ns[ns.length - 1] = tmp_s.split('.').slice(0, -1).join('.');
 				}
 
-				let classId = '';
 				if (tmp_i !== -1) {
-					classId = ns.slice(tmp_i + 1).join('.');
+					id = ns.slice(tmp_i + 1).join('.');
 				}
 
 
-				this.id        = pkg.id + '.' + classId;
-				this.classId   = classId;
-				this.packageId = pkg.id;
+				this.id = pkg.id + '.' + id;
 
 			}
 
@@ -1687,26 +1697,18 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 		id = typeof id === 'string' ? id : '';
 
 
-		this.id        = '';
-		this.classId   = '';
-		this.packageId = '';
+		this.id     = '';
 
-		this.__file    = lychee.Environment.__FILENAME || null;
+		this.__file = lychee.Environment.__FILENAME || null;
 
 
 		if (/\./.test(id)) {
 
-			let tmp = id.split('.');
+			this.id = id;
 
-			this.id        = id;
-			this.classId   = tmp.slice(1).join('.');
-			this.packageId = tmp[0];
+		} else if (/^([A-Za-z0-9\.]+)/g.test(id)) {
 
-		} else if (/^([A-Za-z0-9\.]+)/g.test(id) === true) {
-
-			this.id        = 'lychee.' + id;
-			this.classId   = id;
-			this.packageId = 'lychee';
+			this.id = 'lychee.' + id;
 
 		} else {
 
@@ -1871,7 +1873,7 @@ lychee.Definition = typeof lychee.Definition !== 'undefined' ? lychee.Definition
 				for (let id in map) {
 
 					let value = map[id];
-					if (value instanceof Font || value instanceof Music || value instanceof Sound || value instanceof Texture || value !== undefined) {
+					if (value !== undefined) {
 						this._attaches[id] = map[id];
 					}
 
@@ -2305,14 +2307,13 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		let dependencies = [];
 
-
 		if (definition instanceof lychee.Definition) {
 
 			for (let i = 0, il = definition._includes.length; i < il; i++) {
 
-				let inc      = definition._includes[i];
-				let incclass = _get_class.call(this.global, inc);
-				if (incclass === null) {
+				let inc   = definition._includes[i];
+				let check = _get_composite.call(this.global, inc);
+				if (check === null) {
 					dependencies.push(inc);
 				}
 
@@ -2320,9 +2321,9 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 			for (let r = 0, rl = definition._requires.length; r < rl; r++) {
 
-				let req      = definition._requires[r];
-				let reqclass = _get_class.call(this.global, req);
-				if (reqclass === null) {
+				let req   = definition._requires[r];
+				let check = _get_composite.call(this.global, req);
+				if (check === null) {
 					dependencies.push(req);
 				}
 
@@ -2330,20 +2331,19 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		}
 
-
 		return dependencies;
 
 	};
 
 	const _export_definition = function(definition) {
 
-		if (_get_class.call(this.global, definition.id) !== null) {
+		if (_get_composite.call(this.global, definition.id) !== null) {
 			return false;
 		}
 
 
 		let namespace  = _get_namespace.call(this.global, definition.id);
-		let identifier = definition.classId.split('.').pop();
+		let identifier = definition.id.split('.').pop();
 
 
 		if (this.debug === true) {
@@ -2541,7 +2541,7 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 	};
 
-	const _get_class = function(identifier) {
+	const _get_composite = function(identifier) {
 
 		let id = identifier.split('.').pop();
 
@@ -3031,8 +3031,9 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 			if (identifier !== null) {
 
-				let packageId = identifier.split('.')[0];
-				let classId   = identifier.split('.').slice(1).join('.');
+				let tmp    = identifier.split('.');
+				let pkg_id = tmp[0];
+				let def_id = tmp.slice(1).join('.');
 
 
 				let definition = this.definitions[identifier] || null;
@@ -3043,12 +3044,12 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 				} else {
 
 					let pkg = this.packages.find(function(pkg) {
-						return pkg.id === packageId;
+						return pkg.id === pkg_id;
 					}) || null;
 
 					if (pkg !== null && pkg.isReady() === true) {
 
-						let result = pkg.load(classId, this.tags);
+						let result = pkg.load(def_id, this.tags);
 						if (result === true) {
 
 							if (this.debug === true) {
@@ -3071,21 +3072,25 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		},
 
-		define: function(definition) {
+		define: function(definition, inject) {
 
-			let filename = Composite.__FILENAME || null;
-			if (filename !== null) {
+			definition = definition instanceof lychee.Definition ? definition : null;
+			inject     = inject === true;
 
-				if (definition instanceof lychee.Definition) {
 
-					let oldPackageId = definition.packageId;
-					let newPackageId = null;
+			if (definition !== null) {
+
+				let filename = Composite.__FILENAME || null;
+				if (inject === false && filename !== null) {
+
+					let old_pkg_id = definition.id.split('.')[0];
+					let new_pkg_id = null;
 
 					for (let p = 0, pl = this.packages.length; p < pl; p++) {
 
 						let root = this.packages[p].root;
 						if (filename.substr(0, root.length) === root) {
-							newPackageId = this.packages[p].id;
+							new_pkg_id = this.packages[p].id;
 							break;
 						}
 
@@ -3097,7 +3102,7 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 					for (let p = 0, pl = this.packages.length; p < pl; p++) {
 
 						let id = this.packages[p].id;
-						if (id === oldPackageId || id === newPackageId) {
+						if (id === old_pkg_id || id === new_pkg_id) {
 							assimilation = false;
 							break;
 						}
@@ -3114,21 +3119,20 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 						this.__cache.assimilations.push(definition.id);
 
-					} else if (newPackageId !== null && newPackageId !== oldPackageId) {
+					} else if (new_pkg_id !== null && new_pkg_id !== old_pkg_id) {
 
 						if (this.debug === true) {
-							this.global.console.log('lychee-Environment (' + this.id + '): Injecting Definition "' + definition.id + '" as "' + newPackageId + '.' + definition.classId + '"');
+							this.global.console.log('lychee-Environment (' + this.id + '): Injecting Definition "' + definition.id + '" into package "' + new_pkg_id + '"');
 						}
 
 
-						definition.packageId = newPackageId;
-						definition.id        = definition.packageId + '.' + definition.classId;
+						definition.id = new_pkg_id + '.' + definition.id.split('.').slice(1).join('.');
 
 						for (let i = 0, il = definition._includes.length; i < il; i++) {
 
 							let inc = definition._includes[i];
-							if (inc.substr(0, oldPackageId.length) === oldPackageId) {
-								definition._includes[i] = newPackageId + inc.substr(oldPackageId.length);
+							if (inc.substr(0, old_pkg_id.length) === old_pkg_id) {
+								definition._includes[i] = new_pkg_id + inc.substr(old_pkg_id.length);
 							}
 
 						}
@@ -3136,40 +3140,43 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 						for (let r = 0, rl = definition._requires.length; r < rl; r++) {
 
 							let req = definition._requires[r];
-							if (req.substr(0, oldPackageId.length) === oldPackageId) {
-								definition._requires[r] = newPackageId + req.substr(oldPackageId.length);
+							if (req.substr(0, old_pkg_id.length) === old_pkg_id) {
+								definition._requires[r] = new_pkg_id + req.substr(old_pkg_id.length);
 							}
 
 						}
 
 					}
 
+				} else {
+
+					// XXX: Direct injection has no auto-mapping
+
+				}
+
+
+				if (_validate_definition.call(this, definition) === true) {
+
+					if (this.debug === true) {
+						let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
+						this.global.console.log('lychee-Environment (' + this.id + '): Mapping "' + definition.id + '" ' + info);
+					}
+
+					this.definitions[definition.id] = definition;
+
+
+					return true;
+
 				}
 
 			}
 
 
-			if (_validate_definition.call(this, definition) === true) {
-
-				if (this.debug === true) {
-					let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
-					this.global.console.log('lychee-Environment (' + this.id + '): Mapping "' + definition.id + '" ' + info);
-				}
-
-				this.definitions[definition.id] = definition;
+			let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
+			this.global.console.error('lychee-Environment (' + this.id + '): Invalid Definition "' + definition.id + '" ' + info);
 
 
-				return true;
-
-			} else {
-
-				let info = Object.keys(definition._tags).length > 0 ? ('(' + JSON.stringify(definition._tags) + ')') : '';
-				this.global.console.error('lychee-Environment (' + this.id + '): Invalid Definition "' + definition.id + '" ' + info);
-
-
-				return false;
-
-			}
+			return false;
 
 		},
 
@@ -3336,7 +3343,13 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -3410,7 +3423,10 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setDebug: function(debug) {
 
-			if (debug === true || debug === false) {
+			debug = typeof debug === 'boolean' ? debug : null;
+
+
+			if (debug !== null) {
 
 				this.debug = debug;
 
@@ -3461,7 +3477,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 			if (id !== null) {
 
 				this.id = id;
-
 
 				return true;
 
@@ -3514,8 +3529,10 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setSandbox: function(sandbox) {
 
-			if (sandbox === true || sandbox === false) {
+			sandbox = typeof sandbox === 'boolean' ? sandbox : null;
 
+
+			if (sandbox !== null) {
 
 				if (sandbox !== this.sandbox) {
 
@@ -3554,7 +3571,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 				this.tags = {};
 
-
 				for (let type in tags) {
 
 					let values = tags[type];
@@ -3567,7 +3583,6 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 					}
 
 				}
-
 
 				return true;
 
@@ -3598,17 +3613,22 @@ lychee.Environment = typeof lychee.Environment !== 'undefined' ? lychee.Environm
 
 		setType: function(type) {
 
-			if (type === 'source' || type === 'export' || type === 'build') {
-
-				this.type = type;
+			type = typeof type === 'string' ? type : null;
 
 
-				for (let p = 0, pl = this.packages.length; p < pl; p++) {
-					this.packages[p].setType(this.type);
+			if (type !== null) {
+
+				if (type === 'source' || type === 'export' || type === 'build') {
+
+					this.type = type;
+
+					for (let p = 0, pl = this.packages.length; p < pl; p++) {
+						this.packages[p].setType(this.type);
+					}
+
+					return true;
+
 				}
-
-
-				return true;
 
 			}
 
@@ -3979,9 +3999,6 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		url = typeof url === 'string' ? url : null;
 
 
-		// This is public to allow loading packages
-		// as external renamespaced libraries
-
 		this.id   = id;
 		this.url  = null;
 		this.root = null;
@@ -4204,24 +4221,33 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 
 	const _load_asset = function(settings, callback, scope) {
 
-		let path     = lychee.environment.resolve(settings.url);
-		let encoding = settings.encoding === 'binary' ? 'binary' : 'utf8';
+		settings = settings instanceof Object   ? settings : null;
+		callback = callback instanceof Function ? callback : null;
+		scope    = scope !== undefined          ? scope    : null;
 
 
-		_fs.readFile(path, encoding, function(error, buffer) {
+		if (settings !== null && callback !== null && scope !== null) {
 
-			let raw = null;
-			if (!error) {
-				raw = buffer;
-			}
+			let path     = lychee.environment.resolve(settings.url);
+			let encoding = settings.encoding === 'binary' ? 'binary' : 'utf8';
 
-			try {
-				callback.call(scope, raw);
-			} catch (err) {
-				lychee.Debugger.report(lychee.environment, err, null);
-			}
 
-		});
+			_fs.readFile(path, encoding, function(error, buffer) {
+
+				let raw = null;
+				if (!error) {
+					raw = buffer;
+				}
+
+				try {
+					callback.call(scope, raw);
+				} catch (err) {
+					lychee.Debugger.report(lychee.environment, err, null);
+				}
+
+			});
+
+		}
 
 	};
 
@@ -4231,16 +4257,15 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 	 * POLYFILLS
 	 */
 
-	const _log     = console.log   || function() {};
-	const _info    = console.info  || console.log;
-	const _warn    = console.warn  || console.log;
-	const _error   = console.error || console.log;
-	let   _std_out = '';
-	let   _std_err = '';
+	let _std_out = '';
+	let _std_err = '';
 
 	const _INDENT         = '    ';
 	const _WHITESPACE     = new Array(512).fill(' ').join('');
 	const _args_to_string = function(args, offset) {
+
+		offset = typeof offset === 'number' ? offset : null;
+
 
 		let output  = [];
 		let columns = process.stdout.columns;
@@ -4324,29 +4349,43 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		let ol = output.length;
 		if (ol > 1) {
 
-			for (let o = 0; o < ol; o++) {
+			if (offset !== null) {
 
-				let line = output[o];
-				let maxl = (o === 0 || o === ol - 1) ? (columns - offset) : columns;
-				if (line.length > maxl) {
-					output[o] = line.substr(0, maxl);
-				} else {
-					output[o] = line + _WHITESPACE.substr(0, maxl - line.length);
+				for (let o = 0; o < ol; o++) {
+
+					let line = output[o];
+					let maxl = (o === 0 || o === ol - 1) ? (columns - offset) : columns;
+					if (line.length > maxl) {
+						output[o] = line.substr(0, maxl);
+					} else {
+						output[o] = line + _WHITESPACE.substr(0, maxl - line.length);
+					}
+
 				}
 
 			}
+
 
 			return output.join('\n');
 
 		} else {
 
-			let line = output[0];
-			let maxl = columns - offset * 2;
-			if (line.length > maxl) {
-				return line.substr(0, maxl);
-			} else {
-				return line + _WHITESPACE.substr(0, maxl - line.length);
+			if (offset !== null) {
+
+				let line = output[0];
+				let maxl = columns - offset * 2;
+				if (line.length > maxl) {
+					line = line.substr(0, maxl);
+				} else {
+					line = line + _WHITESPACE.substr(0, maxl - line.length);
+				}
+
+				return line;
+
 			}
+
+
+			return output[0];
 
 		}
 
@@ -4373,13 +4412,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_log.call(console,
-			' ',
-			_args_to_string(args, 2),
-			' '
-		);
+		process.stdout.write('\u001b[49m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4391,15 +4426,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_info.call(console,
-			'\u001b[37m',
-			'\u001b[42m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stdout.write('\u001b[42m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4411,15 +4440,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_out += args.join('\t') + '\n';
+		_std_out += _args_to_string(args) + '\n';
 
-		_warn.call(console,
-			'\u001b[37m',
-			'\u001b[43m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stdout.write('\u001b[43m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4431,15 +4454,9 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			args.push(arguments[a]);
 		}
 
-		_std_err += args.join('\t') + '\n';
+		_std_err += _args_to_string(args) + '\n';
 
-		_error.call(console,
-			'\u001b[37m',
-			'\u001b[41m',
-			_args_to_string(args, 2),
-			'\u001b[49m',
-			'\u001b[39m'
-		);
+		process.stderr.write('\u001b[41m\u001b[97m ' + _args_to_string(args, 1) + ' \u001b[39m\u001b[49m\u001b[0m\n');
 
 	};
 
@@ -4897,18 +4914,26 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 		}
 
 
+		_parse_font_characters.call(this);
+
+	};
+
+	const _parse_font_characters = function() {
+
+		let data = this.__buffer;
+		let url  = this.url;
+
+		if (_CHAR_CACHE[url] === undefined) {
+			_CHAR_CACHE[url] = {};
+		}
+
 		if (data.map instanceof Array) {
 
 			let offset = this.spacing;
-			let url    = this.url;
-
-			if (_CHAR_CACHE[url] === undefined) {
-				_CHAR_CACHE[url] = {};
-			}
 
 			for (let c = 0, cl = this.charset.length; c < cl; c++) {
 
-				let id = this.charset[c];
+				let id  = this.charset[c];
 				let chr = {
 					width:      data.map[c] + this.spacing * 2,
 					height:     this.lineheight,
@@ -5035,49 +5060,133 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 			text = typeof text === 'string' ? text : null;
 
 
-			let cache = _CHAR_CACHE[this.url] || null;
-			if (cache !== null) {
+			let buffer = this.__buffer;
+			if (buffer !== null) {
 
-				let tl = text.length;
-				if (tl === 1) {
+				// Cache Usage
+				if (this.__load === false) {
 
-					if (cache[text] !== undefined) {
-						return cache[text];
-					}
+					let cache = _CHAR_CACHE[this.url] || null;
+					if (cache !== null) {
 
-				} else if (tl > 1) {
+						let tl = text.length;
+						if (tl === 1) {
 
-					let data = cache[text] || null;
-					if (data === null) {
+							if (cache[text] !== undefined) {
+								return cache[text];
+							}
 
-						let width = 0;
+						} else if (tl > 1) {
 
-						for (let t = 0; t < tl; t++) {
-							let chr = this.measure(text[t]);
-							width  += chr.realwidth + this.kerning;
+							let data = cache[text] || null;
+							if (data === null) {
+
+								let width = 0;
+								let map   = buffer.map;
+
+								for (let t = 0; t < tl; t++) {
+
+									let m = this.charset.indexOf(text[t]);
+									if (m !== -1) {
+										width += map[m] + this.kerning;
+									}
+
+								}
+
+								if (width > 0) {
+
+									// TODO: Embedded Font ligatures will set x and y values based on settings.map
+									data = cache[text] = {
+										width:      width,
+										height:     this.lineheight,
+										realwidth:  width,
+										realheight: this.lineheight,
+										x:          0,
+										y:          0
+									};
+
+								}
+
+							}
+
+
+							return data;
+
 						}
 
 
-						// TODO: Embedded Font ligatures will set x and y values based on settings.map
+						return cache[''];
 
-						data = cache[text] = {
-							width:      width,
-							height:     this.lineheight,
-							realwidth:  width,
-							realheight: this.lineheight,
-							x:          0,
-							y:          0
-						};
+					}
+
+				// Temporary Usage
+				} else {
+
+					let tl = text.length;
+					if (tl === 1) {
+
+						let m = this.charset.indexOf(text);
+						if (m !== -1) {
+
+							let offset  = this.spacing;
+							let spacing = this.spacing;
+							let map     = buffer.map;
+
+							for (let c = 0; c < m; c++) {
+								offset += map[c] + spacing * 2;
+							}
+
+							return {
+								width:      map[m] + spacing * 2,
+								height:     this.lineheight,
+								realwidth:  map[m],
+								realheight: this.lineheight,
+								x:          offset - spacing,
+								y:          0
+							};
+
+						}
+
+					} else if (tl > 1) {
+
+						let width = 0;
+						let map   = buffer.map;
+
+						for (let t = 0; t < tl; t++) {
+
+							let m = this.charset.indexOf(text[t]);
+							if (m !== -1) {
+								width += map[m] + this.kerning;
+							}
+
+						}
+
+						if (width > 0) {
+
+							return {
+								width:      width,
+								height:     this.lineheight,
+								realwidth:  width,
+								realheight: this.lineheight,
+								x:          0,
+								y:          0
+							};
+
+						}
 
 					}
 
 
-					return data;
+					return {
+						width:      0,
+						height:     this.lineheight,
+						realwidth:  0,
+						realheight: this.lineheight,
+						x:          0,
+						y:          0
+					};
 
 				}
-
-
-				return cache[''];
 
 			}
 
@@ -5695,11 +5804,11 @@ lychee.Package = typeof lychee.Package !== 'undefined' ? lychee.Package : (funct
 
 			_filename = stuff.url;
 
+
 			let cid = lychee.environment.resolve(stuff.url);
 			if (require.cache[cid] !== undefined) {
 				delete require.cache[cid];
 			}
-
 
 			try {
 				require(cid);
@@ -6224,7 +6333,10 @@ lychee.define('Input').tags({
 
 		setKey: function(key) {
 
-			if (key === true || key === false) {
+			key = typeof key === 'boolean' ? key : null;
+
+
+			if (key !== null) {
 
 				this.key = key;
 
@@ -6239,7 +6351,10 @@ lychee.define('Input').tags({
 
 		setKeyModifier: function(keymodifier) {
 
-			if (keymodifier === true || keymodifier === false) {
+			keymodifier = typeof keymodifier === 'boolean' ? keymodifier : null;
+
+
+			if (keymodifier !== null) {
 
 				this.keymodifier = keymodifier;
 
@@ -6254,9 +6369,31 @@ lychee.define('Input').tags({
 
 		setTouch: function(touch) {
 
-			if (touch === true || touch === false) {
-				return false;
+			touch = typeof touch === 'boolean' ? touch : null;
+
+
+			if (touch !== null) {
+
+				// XXX: No touch support
+
 			}
+
+
+			return false;
+
+		},
+
+		setScroll: function(scroll) {
+
+			scroll = typeof scroll === 'boolean' ? scroll : null;
+
+
+			if (scroll !== null) {
+
+				// XXX: No scroll support
+
+			}
+
 
 			return false;
 
@@ -6264,9 +6401,15 @@ lychee.define('Input').tags({
 
 		setSwipe: function(swipe) {
 
-			if (swipe === true || swipe === false) {
-				return false;
+			swipe = typeof swipe === 'boolean' ? swipe : null;
+
+
+			if (swipe !== null) {
+
+				// XXX: No swipe support
+
 			}
+
 
 			return false;
 
@@ -6411,6 +6554,8 @@ lychee.define('Renderer').tags({
 
 		destroy: function() {
 
+			return true;
+
 		},
 
 
@@ -6455,10 +6600,17 @@ lychee.define('Renderer').tags({
 			if (alpha !== null) {
 
 				if (alpha >= 0 && alpha <= 1) {
+
 					this.alpha = alpha;
+
+					return true;
+
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -6468,8 +6620,15 @@ lychee.define('Renderer').tags({
 
 
 			if (color !== null) {
+
 				this.background = color;
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -6479,8 +6638,15 @@ lychee.define('Renderer').tags({
 
 
 			if (id !== null) {
+
 				this.id = id;
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -6500,6 +6666,9 @@ lychee.define('Renderer').tags({
 			this.__ctx = this.__buffer.__ctx;
 			this.offset.x = 0;
 
+
+			return true;
+
 		},
 
 		setHeight: function(height) {
@@ -6517,6 +6686,9 @@ lychee.define('Renderer').tags({
 			this.__buffer.resize(this.width, this.height);
 			this.__ctx = this.__buffer.__ctx;
 			this.offset.y = 0;
+
+
+			return true;
 
 		},
 
@@ -6543,6 +6715,9 @@ lychee.define('Renderer').tags({
 
 			}
 
+
+			return true;
+
 		},
 
 		flush: function() {
@@ -6560,10 +6735,18 @@ lychee.define('Renderer').tags({
 				_process.stdout.write(ctx[y].join('') + '\n');
 			}
 
+			return true;
+
 		},
 
 		createBuffer: function(width, height) {
+
+			width  = typeof width === 'number'  ? width  : 1;
+			height = typeof height === 'number' ? height : 1;
+
+
 			return new _Buffer(width, height);
+
 		},
 
 		setBuffer: function(buffer) {
@@ -6577,6 +6760,9 @@ lychee.define('Renderer').tags({
 				this.__ctx = this.__buffer.__ctx;
 			}
 
+
+			return true;
+
 		},
 
 
@@ -6587,14 +6773,22 @@ lychee.define('Renderer').tags({
 
 		drawArc: function(x, y, start, end, radius, color, background, lineWidth) {
 
-			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
+			x          = x | 0;
+			y          = y | 0;
+			radius     = radius | 0;
+			start      = typeof start === 'number'              ? start     : 0;
+			end        = typeof end === 'number'                ? end       : 2;
+			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color     : '#000000';
 			background = background === true;
-			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
+			lineWidth  = typeof lineWidth === 'number'          ? lineWidth : 1;
 
 
 			// TODO: Implement arc-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 			// let pi2 = Math.PI * 2;
+
+
+			return false;
 
 		},
 
@@ -6602,11 +6796,10 @@ lychee.define('Renderer').tags({
 
 			if (this.alpha < 0.5) return;
 
-			x1 = x1 | 0;
-			y1 = y1 | 0;
-			x2 = x2 | 0;
-			y2 = y2 | 0;
-
+			x1         = x1 | 0;
+			y1         = y1 | 0;
+			x2         = x2 | 0;
+			y2         = y2 | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6652,36 +6845,88 @@ lychee.define('Renderer').tags({
 				_draw_ctx.call(ctx, x, y, '|');
 			}
 
+
+			return true;
+
 		},
 
-		drawBuffer: function(x1, y1, buffer) {
+		drawBuffer: function(x1, y1, buffer, map) {
 
+			x1     = x1 | 0;
+			y1     = y1 | 0;
 			buffer = buffer instanceof _Buffer ? buffer : null;
+			map    = map instanceof Object     ? map    : null;
 
 
 			if (buffer !== null) {
 
-				let ctx = this.__ctx;
+				let ctx    = this.__ctx;
+				let width  = 0;
+				let height = 0;
+				let x      = 0;
+				let y      = 0;
+				let r      = 0;
 
 
-				let x2 = Math.min(x1 + buffer.width,  this.__buffer.width);
-				let y2 = Math.min(y1 + buffer.height, this.__buffer.height);
+				// XXX: No support for alpha :(
 
+				if (map === null) {
 
-				for (let y = y1; y < y2; y++) {
+					width  = buffer.width;
+					height = buffer.height;
 
-					for (let x = x1; x < x2; x++) {
-						ctx[y][x] = buffer.__ctx[y - y1][x - x1];
+					let x2 = Math.min(x1 + width,  this.__buffer.width);
+					let y2 = Math.min(y1 + height, this.__buffer.height);
+
+					for (let cy = y1; cy < y2; cy++) {
+
+						for (let cx = x1; cx < x2; cx++) {
+							ctx[cy][cx] = buffer.__ctx[cy - y1][cx - x1];
+						}
+
+					}
+
+				} else {
+
+					width  = map.w;
+					height = map.h;
+					x      = map.x;
+					y      = map.y;
+					r      = map.r || 0;
+
+					if (r === 0) {
+
+						let x2 = Math.min(x1 + width,  this.__buffer.width);
+						let y2 = Math.min(y1 + height, this.__buffer.height);
+
+						for (let cy = y1; cy < y2; cy++) {
+
+							for (let cx = x1; cx < x2; cx++) {
+								ctx[cy][cx] = buffer.__ctx[cy - y1 + y][cx - x1 + x];
+							}
+
+						}
+
+					} else {
+
+						// XXX: No support for rotation
+
 					}
 
 				}
 
 			}
 
+
+			return true;
+
 		},
 
 		drawCircle: function(x, y, radius, color, background, lineWidth) {
 
+			x          = x | 0;
+			y          = y | 0;
+			radius     = radius | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6690,10 +6935,17 @@ lychee.define('Renderer').tags({
 			// TODO: Implement circle-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return true;
+
 		},
 
 		drawLine: function(x1, y1, x2, y2, color, lineWidth) {
 
+			x1        = x1 | 0;
+			y1        = y1 | 0;
+			x2        = x2 | 0;
+			y2        = y2 | 0;
 			color     = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			lineWidth = typeof lineWidth === 'number' ? lineWidth : 1;
 
@@ -6701,10 +6953,19 @@ lychee.define('Renderer').tags({
 			// TODO: Implement line-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return false;
+
 		},
 
 		drawTriangle: function(x1, y1, x2, y2, x3, y3, color, background, lineWidth) {
 
+			x1         = x1 | 0;
+			y1         = y1 | 0;
+			x2         = x2 | 0;
+			y2         = y2 | 0;
+			x3         = x3 | 0;
+			y3         = y3 | 0;
 			color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 			background = background === true;
 			lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6713,10 +6974,18 @@ lychee.define('Renderer').tags({
 			// TODO: Implement triangle-drawing ASCII art algorithm
 			// let ctx = this.__ctx;
 
+
+			return false;
+
 		},
 
 		// points, x1, y1, [ ... x(a), y(a) ... ], [ color, background, lineWidth ]
 		drawPolygon: function(points, x1, y1) {
+
+			points = typeof points === 'number' ? points : 0;
+			x1     = x1 | 0;
+			y1     = y1 | 0;
+
 
 			// TODO: Implement polygon-drawing ASCII art algorithm
 			// let l = arguments.length;
@@ -6746,6 +7015,8 @@ lychee.define('Renderer').tags({
 				// }
 
 
+				// x1         = x1 | 0;
+				// y1         = y1 | 0;
 				// color      = /(#[AaBbCcDdEeFf0-9]{6})/g.test(color) ? color : '#000000';
 				// background = background === true;
 				// lineWidth  = typeof lineWidth === 'number' ? lineWidth : 1;
@@ -6755,10 +7026,15 @@ lychee.define('Renderer').tags({
 
 			// }
 
+
+			return false;
+
 		},
 
 		drawSprite: function(x1, y1, texture, map) {
 
+			x1      = x1 | 0;
+			y1      = y1 | 0;
 			texture = texture instanceof Texture ? texture : null;
 			map     = map instanceof Object      ? map     : null;
 
@@ -6774,11 +7050,17 @@ lychee.define('Renderer').tags({
 
 			}
 
+
+			return false;
+
 		},
 
 		drawText: function(x1, y1, text, font, center) {
 
-			font   = font instanceof Font ? font : null;
+			x1     = x1 | 0;
+			y1     = y1 | 0;
+			text   = typeof text === 'string' ? text : null;
+			font   = font instanceof Font     ? font : null;
 			center = center === true;
 
 
@@ -6788,17 +7070,13 @@ lychee.define('Renderer').tags({
 
 					let dim = font.measure(text);
 
-					x1 -= dim.realwidth / 2;
-					y1 -= (dim.realheight - font.baseline) / 2;
+					x1 = (x1 - dim.realwidth / 2) | 0;
+					y1 = (y1 - (dim.realheight - font.baseline) / 2) | 0;
 
 				}
 
 
-				y1 -= font.baseline / 2;
-
-
-				x1 = x1 | 0;
-				y1 = y1 | 0;
+				y1 = (y1 - font.baseline / 2) | 0;
 
 
 				let ctx = this.__ctx;
@@ -6822,9 +7100,15 @@ lychee.define('Renderer').tags({
 
 					}
 
+
+					return true;
+
 				}
 
 			}
+
+
+			return false;
 
 		}
 
@@ -7366,11 +7650,10 @@ lychee.define('Stash').tags({
 
 				let result = true;
 				let that   = this;
-				let il     = ids.length;
 
 				if (action === 'read') {
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						let asset = this.read(ids[i]);
 						if (asset !== null) {
@@ -7406,7 +7689,7 @@ lychee.define('Stash').tags({
 
 					this.bind('#sync', _on_batch_remove, cache);
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						if (this.remove(ids[i]) === false) {
 							result = false;
@@ -7425,7 +7708,7 @@ lychee.define('Stash').tags({
 
 					this.bind('#sync', _on_batch_write, cache);
 
-					for (let i = 0; i < il; i++) {
+					for (let i = 0, il = ids.length; i < il; i++) {
 
 						if (this.write(ids[i], assets[i]) === false) {
 							result = false;
@@ -7602,7 +7885,7 @@ lychee.define('Storage').tags({
 	const _PERSISTENT = {
 		data: {},
 		read: function() {
-			return null;
+			return false;
 		},
 		write: function() {
 			return false;
@@ -7611,14 +7894,7 @@ lychee.define('Storage').tags({
 	const _TEMPORARY  = {
 		data: {},
 		read: function() {
-
-			if (Object.keys(this.data).length > 0) {
-				return this.data;
-			}
-
-
-			return null;
-
+			return true;
 		},
 		write: function() {
 			return true;
@@ -8364,7 +8640,19 @@ lychee.define('Viewport').tags({
 		 */
 
 		setFullscreen: function(fullscreen) {
+
+			fullscreen = typeof fullscreen === 'boolean' ? fullscreen : null;
+
+
+			if (fullscreen !== null) {
+
+				// XXX: No fullscreen support
+
+			}
+
+
 			return false;
+
 		}
 
 	};
@@ -8911,7 +9199,9 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				if (connection !== null) {
 
-					protocol = new _Protocol(_Protocol.TYPE.remote);
+					protocol = new _Protocol({
+						type: _Protocol.TYPE.remote
+					});
 
 					connection.allowHalfOpen = true;
 					connection.setTimeout(0);
@@ -8926,7 +9216,9 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				} else {
 
-					protocol   = new _Protocol(_Protocol.TYPE.client);
+					protocol   = new _Protocol({
+						type: _Protocol.TYPE.client
+					});
 					connection = new _net.Socket({
 						readable: true,
 						writable: true
@@ -8948,7 +9240,13 @@ lychee.define('lychee.net.socket.HTTP').tags({
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -8970,12 +9268,18 @@ lychee.define('lychee.net.socket.HTTP').tags({
 					let enc   = binary === true ? 'binary' : 'utf8';
 
 					if (chunk !== null) {
+
 						connection.write(chunk, enc);
+
+						return true;
 					}
 
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -9409,7 +9713,9 @@ lychee.define('lychee.net.socket.WS').tags({
 
 					connection.on('upgrade', function(event) {
 
-						let protocol = new _Protocol(_Protocol.TYPE.remote);
+						let protocol = new _Protocol({
+							type: _Protocol.TYPE.remote
+						});
 						let socket   = event.socket || null;
 
 
@@ -9462,7 +9768,9 @@ lychee.define('lychee.net.socket.WS').tags({
 
 					connector.on('upgrade', function(event) {
 
-						let protocol = new _Protocol(_Protocol.TYPE.client);
+						let protocol = new _Protocol({
+							type: _Protocol.TYPE.client
+						});
 						let socket   = event.socket || null;
 
 
@@ -9543,7 +9851,13 @@ lychee.define('lychee.net.socket.WS').tags({
 
 				}
 
+
+				return true;
+
 			}
+
+
+			return false;
 
 		},
 
@@ -9565,12 +9879,18 @@ lychee.define('lychee.net.socket.WS').tags({
 					let enc   = binary === true ? 'binary' : 'utf8';
 
 					if (chunk !== null) {
+
 						connection.write(chunk, enc);
+
+						return true;
 					}
 
 				}
 
 			}
+
+
+			return false;
 
 		},
 
@@ -9876,7 +10196,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 				return true;
 
-			} else if (/start|stop|edit|file|web/g.test(action) && resource !== '') {
+			} else if (/^(start|stop|edit|file|web)$/g.test(action) && resource !== '') {
 
 				return true;
 
@@ -9896,7 +10216,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 	const _help = function(value) {
 
 		let action = value.split('=')[0];
-		let helper = null;
+		let result = false;
 
 
 		if (action === 'refresh') {
@@ -9916,11 +10236,7 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 					stderr = (stderr.trim() || '').toString();
 
-					if (error !== null && error.signal !== 'SIGTERM') {
-
-						helper = null;
-
-					} else if (stderr !== '') {
+					if (stderr !== '') {
 
 						if (lychee.debug === true) {
 
@@ -9943,16 +10259,18 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 				helper.on('exit', function(code) {});
 
+				result = true;
+
 			} catch (err) {
 
-				helper = null;
+				result = false;
 
 			}
 
 		}
 
 
-		return helper !== null;
+		return result;
 
 	};
 
@@ -10129,10 +10447,10 @@ lychee.define('lychee.ui.entity.Helper').tags({
 
 		setValue: function(value) {
 
-			value = _is_value(value) === true ? value : null;
+			value = typeof value === 'string' ? value : null;
 
 
-			if (value !== null) {
+			if (value !== null && _is_value(value) === true) {
 
 				this.value    = value;
 				this.__action = value.split('=')[0] || null;
@@ -10308,7 +10626,7 @@ lychee.define('lychee.ui.entity.Upload').tags({
 
 (function(lychee, global) {
 
-	let environment = lychee.deserialize({"constructor":"lychee.Environment","arguments":[{"id":"/libraries/breeder/dist","build":"breeder.Main","debug":false,"sandbox":false,"timeout":5000,"type":"build","tags":{"platform":["node"]}}],"blob":{"definitions":{"breeder.Main":{"constructor":"lychee.Definition","arguments":["breeder.Main"],"blob":{"attaches":{},"requires":["lychee.Input","breeder.Template"],"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _lychee   = lychee.import('lychee');\n\tconst _Emitter  = lychee.import('lychee.event.Emitter');\n\tconst _Input    = lychee.import('lychee.Input');\n\tconst _Template = lychee.import('breeder.Template');\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\tlet _DEFAULTS = {\n\n\t\taction:  null,\n\t\tproject: null,\n\t\tlibrary: null\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(settings) {\n\n\t\tthis.settings = _lychee.assignunlink({}, _DEFAULTS, settings);\n\t\tthis.defaults = _lychee.assignunlink({}, this.settings);\n\n\n\t\t_Emitter.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('load', function() {\n\n\t\t\tlet action  = this.settings.action  || null;\n\t\t\tlet project = this.settings.project || null;\n\n\t\t\tif (action !== null && project !== null) {\n\n\t\t\t\tlychee.ROOT.project                           = _lychee.ROOT.lychee + project;\n\t\t\t\tlychee.environment.global.lychee.ROOT.project = _lychee.ROOT.lychee + project;\n\n\n\t\t\t\tthis.trigger('init', [ project, action ]);\n\n\t\t\t} else {\n\n\t\t\t\tconsole.error('breeder: FAILURE (\"' + project + '\") at \"load\" event');\n\n\n\t\t\t\tthis.destroy(1);\n\n\t\t\t}\n\n\t\t}, this, true);\n\n\t\tthis.bind('init', function(project, action) {\n\n\t\t\tlet template = new _Template({\n\t\t\t\tsandbox:  project,\n\t\t\t\tsettings: this.settings\n\t\t\t});\n\n\n\t\t\ttemplate.then(action);\n\n\t\t\ttemplate.bind('complete', function() {\n\n\t\t\t\tif (lychee.debug === true) {\n\t\t\t\t\tconsole.info('breeder: SUCCESS (\"' + project + '\")');\n\t\t\t\t}\n\n\t\t\t\tthis.destroy();\n\n\t\t\t}, this);\n\n\t\t\ttemplate.bind('error', function(event) {\n\n\t\t\t\tif (lychee.debug === true) {\n\t\t\t\t\tconsole.error('breeder: FAILURE (\"' + project + '\") at \"' + event + '\" template event');\n\t\t\t\t}\n\n\t\t\t\tthis.destroy();\n\n\t\t\t}, this);\n\n\n\t\t\ttemplate.init();\n\n\t\t\treturn true;\n\n\t\t}, this, true);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'breeder.Main';\n\n\n\t\t\tlet settings = _lychee.assignunlink({}, this.settings);\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * MAIN API\n\t\t */\n\n\t\tinit: function() {\n\n\t\t\tthis.trigger('load');\n\n\t\t},\n\n\t\tdestroy: function(code) {\n\n\t\t\tcode = typeof code === 'number' ? code : 0;\n\n\n\t\t\tthis.trigger('destroy', [ code ]);\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Emitter":{"constructor":"lychee.Definition","arguments":["lychee.event.Emitter"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _bind = function(event, callback, scope, once) {\n\n\t\tif (event === null || callback === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet pass_event = false;\n\t\tlet pass_self  = false;\n\n\t\tlet modifier = event.charAt(0);\n\t\tif (modifier === '@') {\n\n\t\t\tevent      = event.substr(1, event.length - 1);\n\t\t\tpass_event = true;\n\n\t\t} else if (modifier === '#') {\n\n\t\t\tevent     = event.substr(1, event.length - 1);\n\t\t\tpass_self = true;\n\n\t\t}\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: pass_event,\n\t\t\tpass_self:  pass_self,\n\t\t\tcallback:   callback,\n\t\t\tscope:      scope,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _relay = function(event, instance, once) {\n\n\t\tif (event === null || instance === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet callback = function() {\n\n\t\t\tlet event = arguments[0];\n\t\t\tlet data  = [];\n\n\t\t\tfor (let a = 1, al = arguments.length; a < al; a++) {\n\t\t\t\tdata.push(arguments[a]);\n\t\t\t}\n\n\t\t\tthis.trigger(event, data);\n\n\t\t};\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: true,\n\t\t\tpass_self:  false,\n\t\t\tcallback:   callback,\n\t\t\tscope:      instance,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _trigger = function(event, data) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet value = undefined;\n\n\t\t\tfor (let e = 0; e < this.___events[event].length; e++) {\n\n\t\t\t\tlet args  = [];\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif (entry.pass_event === true) {\n\n\t\t\t\t\targs.push(event);\n\n\t\t\t\t} else if (entry.pass_self === true) {\n\n\t\t\t\t\targs.push(this);\n\n\t\t\t\t}\n\n\n\t\t\t\tif (data !== null) {\n\t\t\t\t\targs.push.apply(args, data);\n\t\t\t\t}\n\n\n\t\t\t\tlet result = entry.callback.apply(entry.scope, args);\n\t\t\t\tif (result !== undefined) {\n\t\t\t\t\tvalue = result;\n\t\t\t\t}\n\n\n\t\t\t\tif (entry.once === true) {\n\n\t\t\t\t\tif (this.unbind(event, entry.callback, entry.scope) === true) {\n\t\t\t\t\t\te--;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (value !== undefined) {\n\t\t\t\treturn value;\n\t\t\t} else {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _unbind = function(event, callback, scope) {\n\n\t\tlet found = false;\n\n\t\tif (event !== null) {\n\n\t\t\tfound = _unbind_event.call(this, event, callback, scope);\n\n\t\t} else {\n\n\t\t\tfor (event in this.___events) {\n\n\t\t\t\tlet result = _unbind_event.call(this, event, callback, scope);\n\t\t\t\tif (result === true) {\n\t\t\t\t\tfound = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn found;\n\n\t};\n\n\tconst _unbind_event = function(event, callback, scope) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif ((callback === null || entry.callback === callback) && (scope === null || entry.scope === scope)) {\n\n\t\t\t\t\tfound = true;\n\n\t\t\t\t\tthis.___events[event].splice(e, 1);\n\t\t\t\t\tel--;\n\t\t\t\t\te--;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn found;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___events   = {};\n\t\tthis.___timeline = {\n\t\t\tbind:    [],\n\t\t\ttrigger: [],\n\t\t\trelay:   [],\n\t\t\tunbind:  []\n\t\t};\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.events instanceof Object) {\n\t\t\t\t// TODO: deserialize events\n\t\t\t}\n\n\t\t\tif (blob.timeline instanceof Object) {\n\t\t\t\t// TODO: deserialize timeline\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (Object.keys(this.___events).length > 0) {\n\n\t\t\t\tblob.events = {};\n\n\t\t\t\tfor (let event in this.___events) {\n\n\t\t\t\t\tblob.events[event] = [];\n\n\t\t\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\t\t\tblob.events[event].push({\n\t\t\t\t\t\t\tpass_event: entry.pass_event,\n\t\t\t\t\t\t\tpass_self:  entry.pass_self,\n\t\t\t\t\t\t\tcallback:   lychee.serialize(entry.callback),\n\t\t\t\t\t\t\t// scope:      lychee.serialize(entry.scope),\n\t\t\t\t\t\t\tscope:      null,\n\t\t\t\t\t\t\tonce:       entry.once\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (this.___timeline.bind.length > 0 || this.___timeline.trigger.length > 0 || this.___timeline.unbind.length > 0) {\n\n\t\t\t\tblob.timeline = {};\n\n\n\t\t\t\tif (this.___timeline.bind.length > 0) {\n\n\t\t\t\t\tblob.timeline.bind = [];\n\n\t\t\t\t\tfor (let b = 0, bl = this.___timeline.bind.length; b < bl; b++) {\n\t\t\t\t\t\tblob.timeline.bind.push(this.___timeline.bind[b]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.trigger.length > 0) {\n\n\t\t\t\t\tblob.timeline.trigger = [];\n\n\t\t\t\t\tfor (let t = 0, tl = this.___timeline.trigger.length; t < tl; t++) {\n\t\t\t\t\t\tblob.timeline.trigger.push(this.___timeline.trigger[t]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.unbind.length > 0) {\n\n\t\t\t\t\tblob.timeline.unbind = [];\n\n\t\t\t\t\tfor (let u = 0, ul = this.___timeline.unbind.length; u < ul; u++) {\n\t\t\t\t\t\tblob.timeline.unbind.push(this.___timeline.unbind[u]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'lychee.event.Emitter',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbind: function(event, callback, scope, once) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _bind.call(this, event, callback, scope, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.bind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope),\n\t\t\t\t\tscope:    null,\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\trelay: function(event, instance, once) {\n\n\t\t\tevent    = typeof event === 'string'               ? event    : null;\n\t\t\tinstance = lychee.interfaceof(Composite, instance) ? instance : null;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _relay.call(this, event, instance, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.relay.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tinstance: lychee.serialize(instance),\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\ttrigger: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tlet result = _trigger.call(this, event, data);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.trigger.push({\n\t\t\t\t\ttime:  Date.now(),\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  lychee.serialize(data)\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tunbind: function(event, callback, scope) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : null;\n\n\n\t\t\tlet result = _unbind.call(this, event, callback, scope);\n\t\t\tif (result === true) {\n\n\t\t\t\tthis.___timeline.unbind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope)\n\t\t\t\t\tscope:    null\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Input":{"constructor":"lychee.Definition","arguments":["lychee.Input"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (\n\t\ttypeof global.process !== 'undefined'\n\t\t&& typeof global.process.stdin === 'object'\n\t\t&& typeof global.process.stdin.on === 'function'\n\t) {\n\t\treturn true;\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _process   = global.process;\n\tconst _Emitter   = lychee.import('lychee.event.Emitter');\n\tconst _INSTANCES = [];\n\n\n\n\t/*\n\t * EVENTS\n\t */\n\n\tconst _listeners = {\n\n\t\tkeypress: function(key) {\n\n\t\t\t// TTY conform behaviour\n\t\t\tif (key.ctrl === true && key.name === 'c') {\n\n\t\t\t\tkey.name  = 'escape';\n\t\t\t\tkey.ctrl  = false;\n\t\t\t\tkey.alt   = false;\n\t\t\t\tkey.shift = false;\n\n\t\t\t}\n\n\n\t\t\tfor (let i = 0, l = _INSTANCES.length; i < l; i++) {\n\t\t\t\t_process_key.call(_INSTANCES[i], key.name, key.ctrl, key.meta, key.shift);\n\t\t\t}\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tlet keypress = true;\n\t\tif (keypress === true) {\n\t\t\t_process.stdin.on('keypress', _listeners.keypress);\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (keypress) methods.push('Keyboard');\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Input: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Input: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_key = function(key, ctrl, alt, shift) {\n\n\t\tif (this.key === false) {\n\n\t\t\treturn false;\n\n\t\t} else if (this.keymodifier === false) {\n\n\t\t\tif (key === 'ctrl' || key === 'meta' || key === 'shift') {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\tlet name    = '';\n\t\tlet handled = false;\n\t\tlet delta   = Date.now() - this.__clock.key;\n\n\t\tif (delta < this.delay) {\n\t\t\treturn true;\n\t\t} else {\n\t\t\tthis.__clock.key = Date.now();\n\t\t}\n\n\n\t\t// 0. Computation: Normal Characters\n\t\tif (ctrl  === true) name += 'ctrl-';\n\t\tif (alt   === true) name += 'alt-';\n\t\tif (shift === true) name += 'shift-';\n\n\t\tname += key.toLowerCase();\n\n\n\t\t// 1. Event API\n\t\tif (key !== null) {\n\n\t\t\t// allow bind('key') and bind('ctrl-a');\n\n\t\t\thandled = this.trigger('key', [ key, name, delta ]) || handled;\n\t\t\thandled = this.trigger(name,  [ delta ])            || handled;\n\n\t\t}\n\n\n\t\treturn handled;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.delay       = 0;\n\t\tthis.key         = false;\n\t\tthis.keymodifier = false;\n\t\tthis.touch       = false;\n\t\tthis.swipe       = false;\n\n\t\tthis.__clock  = {\n\t\t\tkey:   Date.now(),\n\t\t\ttouch: Date.now(),\n\t\t\tswipe: Date.now()\n\t\t};\n\n\n\t\tthis.setDelay(settings.delay);\n\t\tthis.setKey(settings.key);\n\t\tthis.setKeyModifier(settings.keymodifier);\n\t\tthis.setTouch(settings.touch);\n\t\tthis.setSwipe(settings.swipe);\n\n\n\t\t_Emitter.call(this);\n\n\t\t_INSTANCES.push(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\tdestroy: function() {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let i = 0, il = _INSTANCES.length; i < il; i++) {\n\n\t\t\t\tif (_INSTANCES[i] === this) {\n\t\t\t\t\t_INSTANCES.splice(i, 1);\n\t\t\t\t\tfound = true;\n\t\t\t\t\til--;\n\t\t\t\t\ti--;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tthis.unbind();\n\n\n\t\t\treturn found;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Input';\n\n\t\t\tlet settings = {};\n\n\n\t\t\tif (this.delay !== 0)           settings.delay       = this.delay;\n\t\t\tif (this.key !== false)         settings.key         = this.key;\n\t\t\tif (this.keymodifier !== false) settings.keymodifier = this.keymodifier;\n\t\t\tif (this.touch !== false)       settings.touch       = this.touch;\n\t\t\tif (this.swipe !== false)       settings.swipe       = this.swipe;\n\n\n\t\t\tdata['arguments'][0] = settings;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetDelay: function(delay) {\n\n\t\t\tdelay = typeof delay === 'number' ? delay : null;\n\n\n\t\t\tif (delay !== null) {\n\n\t\t\t\tthis.delay = delay;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKey: function(key) {\n\n\t\t\tif (key === true || key === false) {\n\n\t\t\t\tthis.key = key;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKeyModifier: function(keymodifier) {\n\n\t\t\tif (keymodifier === true || keymodifier === false) {\n\n\t\t\t\tthis.keymodifier = keymodifier;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetTouch: function(touch) {\n\n\t\t\tif (touch === true || touch === false) {\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSwipe: function(swipe) {\n\n\t\t\tif (swipe === true || swipe === false) {\n\t\t\t\treturn false;\n\t\t\t}\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Flow":{"constructor":"lychee.Definition","arguments":["lychee.event.Flow"],"blob":{"attaches":{},"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Emitter = lychee.import('lychee.event.Emitter');\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_recursive = function(event, result) {\n\n\t\tif (result === true) {\n\n\t\t\tif (this.___timeout === null) {\n\n\t\t\t\tthis.___timeout = setTimeout(function() {\n\n\t\t\t\t\tthis.___timeout = null;\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t}.bind(this), 0);\n\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('error', [ event ]);\n\n\t\t}\n\n\t};\n\n\tconst _process_stack = function() {\n\n\t\tlet entry = this.___stack.shift() || null;\n\t\tif (entry !== null) {\n\n\t\t\tlet data  = entry.data;\n\t\t\tlet event = entry.event;\n\t\t\tlet args  = [ event, [] ];\n\n\t\t\tif (data !== null) {\n\t\t\t\targs[1].push.apply(args[1], data);\n\t\t\t}\n\n\t\t\targs[1].push(_process_recursive.bind(this, event));\n\n\n\t\t\tlet result = this.trigger.apply(this, args);\n\t\t\tif (result === false) {\n\t\t\t\tthis.trigger('error', [ event ]);\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('complete');\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___init    = false;\n\t\tthis.___stack   = [];\n\t\tthis.___timeout = null;\n\n\t\t_Emitter.call(this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.event.Flow';\n\n\t\t\tlet blob = (data['blob'] || {});\n\n\n\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\tblob.stack = [];\n\n\t\t\t\tfor (let s = 0, sl = this.___stack.length; s < sl; s++) {\n\n\t\t\t\t\tlet entry = this.___stack[s];\n\n\t\t\t\t\tblob.stack.push({\n\t\t\t\t\t\tevent: entry.event,\n\t\t\t\t\t\tdata:  lychee.serialize(entry.data)\n\t\t\t\t\t});\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['blob'] = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tthen: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tif (event !== null) {\n\n\t\t\t\tthis.___stack.push({\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  data\n\t\t\t\t});\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tinit: function() {\n\n\t\t\tif (this.___init === false) {\n\n\t\t\t\tthis.___init = true;\n\n\n\t\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Stash":{"constructor":"lychee.Definition","arguments":["lychee.Stash"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('fs');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tlet   _id         = 0;\n\tconst _Emitter    = lychee.import('lychee.event.Emitter');\n\tconst _PERSISTENT = {\n\t\tdata: {},\n\t\tread: function() {\n\t\t\treturn null;\n\t\t},\n\t\twrite: function(id, asset) {\n\t\t\treturn false;\n\t\t}\n\t};\n\tconst _TEMPORARY  = {\n\t\tdata: {},\n\t\tread: function() {\n\n\t\t\tif (Object.keys(this.data).length > 0) {\n\t\t\t\treturn this.data;\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\t\twrite: function(id, asset) {\n\n\t\t\tif (asset !== null) {\n\t\t\t\tthis.data[id] = asset;\n\t\t\t} else {\n\t\t\t\tdelete this.data[id];\n\t\t\t}\n\n\t\t\treturn true;\n\n\t\t}\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tconst _ENCODING = {\n\t\t\t'Config':  'utf8',\n\t\t\t'Font':    'utf8',\n\t\t\t'Music':   'binary',\n\t\t\t'Sound':   'binary',\n\t\t\t'Texture': 'binary',\n\t\t\t'Stuff':   'utf8'\n\t\t};\n\n\n\t\tconst _fs      = global.require('fs');\n\t\tconst _path    = global.require('path');\n\t\tconst _mkdir_p = function(path, mode) {\n\n\t\t\tif (mode === undefined) {\n\t\t\t\tmode = 0o777 & (~process.umask());\n\t\t\t}\n\n\n\t\t\tlet is_directory = false;\n\n\t\t\ttry {\n\n\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\n\t\t\t} catch (err) {\n\n\t\t\t\tif (err.code === 'ENOENT') {\n\n\t\t\t\t\tif (_mkdir_p(_path.dirname(path), mode) === true) {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.mkdirSync(path, mode);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\ttry {\n\t\t\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\t\t\t\t\t} catch (err) {\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn is_directory;\n\n\t\t};\n\n\n\t\tlet unlink = 'unlinkSync' in _fs;\n\t\tlet write  = 'writeFileSync' in _fs;\n\t\tif (unlink === true && write === true) {\n\n\t\t\t_PERSISTENT.write = function(id, asset) {\n\n\t\t\t\tlet result = false;\n\n\n\t\t\t\tlet path = lychee.environment.resolve(id);\n\t\t\t\tif (path.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\n\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\tlet dir = path.split('/').slice(0, -1).join('/');\n\t\t\t\t\t\tif (dir.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\t\t\t\t\t\t\t_mkdir_p(dir);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tlet data = lychee.serialize(asset);\n\t\t\t\t\t\tif (data !== null && data.blob !== null && typeof data.blob.buffer === 'string') {\n\n\t\t\t\t\t\t\tlet encoding = _ENCODING[data.constructor] || _ENCODING['Stuff'];\n\t\t\t\t\t\t\tlet index    = data.blob.buffer.indexOf('base64,') + 7;\n\t\t\t\t\t\t\tif (index > 7) {\n\n\t\t\t\t\t\t\t\tlet buffer = new Buffer(data.blob.buffer.substr(index, data.blob.buffer.length - index), 'base64');\n\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\t_fs.writeFileSync(path, buffer, encoding);\n\t\t\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.unlinkSync(path);\n\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\treturn result;\n\n\t\t\t};\n\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (write && unlink) methods.push('Persistent');\n\t\t\tif (_TEMPORARY)      methods.push('Temporary');\n\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Stash: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Stash: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _validate_asset = function(asset) {\n\n\t\tif (asset instanceof Object && typeof asset.serialize === 'function') {\n\t\t\treturn true;\n\t\t}\n\n\t\treturn false;\n\n\t};\n\n\tconst _on_batch_remove = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(null);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'remove', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_remove);\n\t\t}\n\n\t};\n\n\tconst _on_batch_write = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(others[key]);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'write', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_write);\n\t\t}\n\n\t};\n\n\tconst _read_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet blob = null;\n\n\n\t\tlet type = this.type;\n\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\tblob = _PERSISTENT.read();\n\n\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\tblob = _TEMPORARY.read();\n\n\t\t}\n\n\n\t\tif (blob !== null) {\n\n\t\t\tif (Object.keys(this.__assets).length !== Object.keys(blob).length) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob) {\n\t\t\t\t\tthis.__assets[id] = blob[id];\n\t\t\t\t}\n\n\n\t\t\t\tif (silent === false) {\n\t\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _write_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet operations = this.__operations;\n\t\tlet filtered   = {};\n\n\t\tif (operations.length !== 0) {\n\n\t\t\twhile (operations.length > 0) {\n\n\t\t\t\tlet operation = operations.shift();\n\t\t\t\tif (operation.type === 'update') {\n\n\t\t\t\t\tfiltered[operation.id] = operation.asset;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== operation.asset) {\n\t\t\t\t\t\tthis.__assets[operation.id] = operation.asset;\n\t\t\t\t\t}\n\n\t\t\t\t} else if (operation.type === 'remove') {\n\n\t\t\t\t\tfiltered[operation.id] = null;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== null) {\n\t\t\t\t\t\tthis.__assets[operation.id] = null;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tlet type = this.type;\n\t\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_PERSISTENT.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_TEMPORARY.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (silent === false) {\n\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.id   = 'lychee-Stash-' + _id++;\n\t\tthis.type = Composite.TYPE.persistent;\n\n\n\t\tthis.__assets     = {};\n\t\tthis.__operations = [];\n\n\n\t\tthis.setId(settings.id);\n\t\tthis.setType(settings.type);\n\n\n\t\t_Emitter.call(this);\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\t_read_stash.call(this);\n\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.TYPE = {\n\t\tpersistent: 0,\n\t\ttemporary:  1\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tsync: function(silent) {\n\n\t\t\tsilent = silent === true;\n\n\n\t\t\tlet result = false;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'sync'\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\tif (this.__operations.length > 0) {\n\t\t\t\tresult = _write_stash.call(this, silent);\n\t\t\t} else {\n\t\t\t\tresult = _read_stash.call(this, silent);\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.assets instanceof Object) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob.assets) {\n\t\t\t\t\tthis.__assets[id] = lychee.deserialize(blob.assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Stash';\n\n\t\t\tlet settings = {};\n\t\t\tlet blob     = (data['blob'] || {});\n\n\n\t\t\tif (this.id.substr(0, 13) !== 'lychee-Stash-') settings.id   = this.id;\n\t\t\tif (this.type !== Composite.TYPE.persistent)   settings.type = this.type;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tblob.assets = {};\n\n\t\t\t\tfor (let id in this.__assets) {\n\t\t\t\t\tblob.assets[id] = lychee.serialize(this.__assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbatch: function(action, ids, assets) {\n\n\t\t\taction = typeof action === 'string' ? action : null;\n\t\t\tids    = ids instanceof Array       ? ids    : null;\n\t\t\tassets = assets instanceof Array    ? assets : null;\n\n\n\t\t\tif (action !== null) {\n\n\t\t\t\tlet cache  = {\n\t\t\t\t\tload:  [].slice.call(ids),\n\t\t\t\t\tready: []\n\t\t\t\t};\n\n\n\t\t\t\tlet result = true;\n\t\t\t\tlet that   = this;\n\t\t\t\tlet il     = ids.length;\n\n\t\t\t\tif (action === 'read') {\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tlet asset = this.read(ids[i]);\n\t\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\t\tasset.onload = function(result) {\n\n\t\t\t\t\t\t\t\tlet index = cache.load.indexOf(this.url);\n\t\t\t\t\t\t\t\tif (index !== -1) {\n\t\t\t\t\t\t\t\t\tcache.ready.push(this);\n\t\t\t\t\t\t\t\t\tcache.load.splice(index, 1);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\tif (cache.load.length === 0) {\n\t\t\t\t\t\t\t\t\tthat.trigger('batch', [ 'read', cache.ready ]);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\tasset.load();\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tresult = false;\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'remove') {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_remove, cache);\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tif (this.remove(ids[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_remove);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'write' && ids.length === assets.length) {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_write, cache);\n\n\t\t\t\t\tfor (let i = 0; i < il; i++) {\n\n\t\t\t\t\t\tif (this.write(ids[i], assets[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_write);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tread: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tlet asset = new lychee.Asset(id, null, true);\n\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\tthis.__assets[id] = asset;\n\n\t\t\t\t\treturn asset;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tremove: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'remove',\n\t\t\t\t\tid:   id\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\twrite: function(id, asset) {\n\n\t\t\tid    = typeof id === 'string'          ? id    : null;\n\t\t\tasset = _validate_asset(asset) === true ? asset : null;\n\n\n\t\t\tif (id !== null && asset !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype:  'update',\n\t\t\t\t\tid:    id,\n\t\t\t\t\tasset: asset\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetId: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.id = id;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetType: function(type) {\n\n\t\t\ttype = lychee.enumof(Composite.TYPE, type) ? type : null;\n\n\n\t\t\tif (type !== null) {\n\n\t\t\t\tthis.type = type;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"breeder.Template":{"constructor":"lychee.Definition","arguments":["breeder.Template"],"blob":{"attaches":{"json":{"constructor":"Config","arguments":["/libraries/breeder/source/Template.json"],"blob":{"buffer":"data:application/json;base64,ewoJImFwaSI6IHsKCQkiZmlsZXMiOiB7fQoJfSwKCSJidWlsZCI6IHsKCQkiZW52aXJvbm1lbnRzIjoge30sCgkJImZpbGVzIjoge30KCX0sCgkic291cmNlIjogewoJCSJlbnZpcm9ubWVudHMiOiB7fSwKCQkidGFncyI6IHt9LAoJCSJmaWxlcyI6IHsKCQkJIkRJU1QiOiBbCgkJCQkianMiCgkJCV0sCgkJCSJNYWluIjogWwoJCQkJImpzIgoJCQldCgkJfQoJfQp9"}},"dist.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.dist.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Cmx5Y2hlZS5kZWZpbmUoJ2ZvcmsuRElTVCcpLnJlcXVpcmVzKFsKCSdhcHAuTWFpbicKXSkuZXhwb3J0cyhmdW5jdGlvbihseWNoZWUsIGdsb2JhbCwgYXR0YWNobWVudHMpIHsKCglsZXQgQ29tcG9zaXRlID0gZnVuY3Rpb24oKSB7fTsKCglDb21wb3NpdGUucHJvdG90eXBlID0gewoKCX07CgoJcmV0dXJuIENvbXBvc2l0ZTsKCn0pOwoK"}},"harvester.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.harvester.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,IyEvdXNyL2xvY2FsL2Jpbi9seWNoZWVqcy1oZWxwZXIgZW52Om5vZGUKCmNvbnN0IF9QT1JUID0gcGFyc2VJbnQocHJvY2Vzcy5hcmd2WzJdLCAxMCk7CmNvbnN0IF9IT1NUID0gcHJvY2Vzcy5hcmd2WzNdID09PSAnbnVsbCcgPyBudWxsIDogcHJvY2Vzcy5hcmd2WzNdOwoKcmVxdWlyZSgnL29wdC9seWNoZWVqcy9saWJyYXJpZXMvbHljaGVlL2J1aWxkL25vZGUvY29yZS5qcycpKF9fZGlybmFtZSk7CgoKCi8qCiAqIElOSVRJQUxJWkFUSU9OCiAqLwoKKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbHljaGVlLnBrZ2luaXQoJ25vZGUvbWFpbicsIHsKCQlkZWJ1ZzogICBmYWxzZSwKCQlzYW5kYm94OiBmYWxzZQoJfSwgewoJCXJlbmRlcmVyOiBudWxsLAoJCWNsaWVudDogICBudWxsLAoJCXNlcnZlcjogICB7CgkJCWhvc3Q6IF9IT1NULAoJCQlwb3J0OiBfUE9SVAoJCX0KCX0pOwoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwoK"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KCTx0aXRsZT5seWNoZWUuanMgRm9yayBCb2lsZXJwbGF0ZTwvdGl0bGU+Cgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+CgoJPCEtLSBCT09UU1RSQVAgLS0+Cgk8c2NyaXB0IHNyYz0iL2xpYnJhcmllcy9seWNoZWUvYnVpbGQvaHRtbC9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlciB7CgkJCWRpc3BsYXk6IGJsb2NrOwoJCQltYXJnaW46IDAgYXV0bzsKCQkJdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS1tb3otdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS1tcy11c2VyLXNlbGVjdDogbm9uZTsKCQkJLXdlYmtpdC11c2VyLXNlbGVjdDogbm9uZTsKCQl9IAoJPC9zdHlsZT4KCjwvaGVhZD4KPGJvZHk+Cgk8c2NyaXB0PgoJKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJCWx5Y2hlZS5wa2dpbml0KCdodG1sL21haW4nLCB7CgkJCWRlYnVnOiAgIGZhbHNlLAoJCQlzYW5kYm94OiBmYWxzZQoJCX0sIHsKCQl9KTsKCgl9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgk8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+ICAgIAo="}},"main.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.main.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Cmx5Y2hlZS5kZWZpbmUoJ2ZvcmsuTWFpbicpLnJlcXVpcmVzKFsKCSdhcHAuTWFpbicsCl0pLmluY2x1ZGVzKFsKCSdseWNoZWUuYXBwLk1haW4nCl0pLmV4cG9ydHMoZnVuY3Rpb24obHljaGVlLCBnbG9iYWwsIGF0dGFjaG1lbnRzKSB7CgoJY29uc3QgX2FwcCAgPSBseWNoZWUuaW1wb3J0KCdhcHAnKTsKCWNvbnN0IF9mb3JrID0gbHljaGVlLmltcG9ydCgnZm9yaycpOwoJY29uc3QgX01haW4gPSBseWNoZWUuaW1wb3J0KCdhcHAuTWFpbicpOwoKCgoJLyoKCSAqIElNUExFTUVOVEFUSU9OCgkgKi8KCglsZXQgQ29tcG9zaXRlID0gZnVuY3Rpb24oZGF0YSkgewoKCQlsZXQgc2V0dGluZ3MgPSBPYmplY3QuYXNzaWduKHsKCQkJLyogQ1VTVE9NIFNFVFRJTkdTICovCgkJfSwgZGF0YSk7CgoKCQlfTWFpbi5jYWxsKHRoaXMsIHNldHRpbmdzKTsKCgl9OwoKCglDb21wb3NpdGUucHJvdG90eXBlID0gewoKCQkvKgoJCSAqIEVOVElUWSBBUEkKCQkgKi8KCgkJLy8gZGVzZXJpYWxpemU6IGZ1bmN0aW9uKGJsb2IpIHt9LAoKCQlzZXJpYWxpemU6IGZ1bmN0aW9uKCkgewoKCQkJbGV0IGRhdGEgPSBfTWFpbi5wcm90b3R5cGUuc2VyaWFsaXplLmNhbGwodGhpcyk7CgkJCWRhdGFbJ2NvbnN0cnVjdG9yJ10gPSAnZm9yay5NYWluJzsKCgoJCQlyZXR1cm4gZGF0YTsKCgkJfQoKCX07CgoKCXJldHVybiBDb21wb3NpdGU7Cgp9KTsK"}}},"requires":["lychee.Stash"],"includes":["lychee.event.Flow"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Flow   = lychee.import('lychee.event.Flow');\n\tconst _Stash  = lychee.import('lychee.Stash');\n\tconst _ASSET  = '/libraries/breeder/asset';\n\tconst _CONFIG = attachments[\"json\"];\n\tconst _STASH  = new _Stash({\n\t\ttype: _Stash.TYPE.persistent\n\t});\n\tconst _TEMPLATE = {\n\t\tdist:      attachments[\"dist.tpl\"],\n\t\tharvester: attachments[\"harvester.tpl\"],\n\t\tindex:     attachments[\"index.tpl\"],\n\t\tmain:      attachments[\"main.tpl\"]\n\t};\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _inject = function(buffer, injections) {\n\n\t\tlet chunk = '';\n\t\tlet code  = buffer.split('\\n');\n\t\tlet c     = 0;\n\t\tlet cl    = code.length;\n\t\tlet found = { include: false, inject: false };\n\t\tlet index = { include: -1,    inject: -1    };\n\t\tlet tmp   = '';\n\t\tlet tmp_s = '';\n\t\tlet tmp_c = '';\n\t\tlet tmp_i = '';\n\t\tlet tpl_s = '';\n\t\tlet tpl_c = '';\n\t\tlet tpl_i = '';\n\n\n\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\tchunk = code[c].trim();\n\n\t\t\tif (chunk.substr(0, 7) === '<script') {\n\n\t\t\t\ttpl_s = '\\t<script src=\"/libraries/';\n\t\t\t\ttpl_c = '\\t<script src=\"${injection}\"></script>';\n\t\t\t\ttpl_i = '\\t\\tlychee.inject(lychee.ENVIRONMENTS[\\'${identifier}\\']);';\n\n\t\t\t\tinjections = injections.filter(function(injection) {\n\t\t\t\t\treturn injection.split('/')[4] === 'html';\n\t\t\t\t});\n\n\t\t\t\tbreak;\n\n\t\t\t} else if (chunk.substr(0, 8) === 'require(') {\n\n\t\t\t\ttpl_s = 'require(\\'/opt/lycheejs/libraries/';\n\t\t\t\ttpl_c = 'require(\\'/opt/lycheejs/${injection}\\');';\n\t\t\t\ttpl_i = '\\tlychee.inject(lychee.ENVIRONMENTS[\\'${identifier}\\']);';\n\n\t\t\t\tinjections = injections.filter(function(injection) {\n\t\t\t\t\treturn injection.split('/')[4] === 'node';\n\t\t\t\t});\n\n\t\t\t\tbreak;\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tfor (let i = 0, il = injections.length; i < il; i++) {\n\n\t\t\tlet injection  = injections[i];\n\t\t\tlet identifier = injection.split('/').slice(0, 3).join('/') + '/' + injection.split('/')[5];\n\n\n\t\t\ttmp_c = tpl_c.replaceObject({\n\t\t\t\tinjection: injection\n\t\t\t});\n\n\t\t\ttmp_i = tpl_i.replaceObject({\n\t\t\t\tidentifier: identifier\n\t\t\t});\n\n\t\t\ttmp_s = tpl_s;\n\n\n\t\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\t\tchunk = code[c].trim();\n\t\t\t\ttmp   = tmp_s.trim();\n\n\n\t\t\t\tif (chunk.substr(0, tmp.length) === tmp) {\n\t\t\t\t\tindex.include = c;\n\t\t\t\t}\n\n\t\t\t\tif (chunk === tmp_c.trim()) {\n\t\t\t\t\tfound.include = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tif (found.include === false && index.include >= 0) {\n\t\t\t\tcode.splice(index.include + 1, 0, tmp_c);\n\t\t\t\tcl++;\n\t\t\t}\n\n\n\t\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\t\tchunk = code[c].trim();\n\n\n\t\t\t\tif (chunk.substr(0, 14) === 'lychee.inject(') {\n\t\t\t\t\tindex.inject = c;\n\t\t\t\t} else if (chunk.substr(0, 15) === 'lychee.envinit(' && index.inject === -1) {\n\t\t\t\t\tindex.inject = c - 1;\n\t\t\t\t} else if (chunk.substr(0, 15) === 'lychee.pkginit(' && index.inject === -1) {\n\t\t\t\t\tindex.inject = c - 1;\n\t\t\t\t}\n\n\t\t\t\tif (chunk === tmp_i.trim()) {\n\t\t\t\t\tfound.inject = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (found.inject === false && index.inject >= 0) {\n\t\t\t\tcode.splice(index.inject + 1, 0, tmp_i);\n\t\t\t\tcl++;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn code.join('\\n');\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.sandbox  = '';\n\t\tthis.settings = {};\n\t\tthis.stash    = new _Stash({\n\t\t\ttype: _Stash.TYPE.persistent\n\t\t});\n\n\n\t\tthis.__identifiers = [];\n\t\tthis.__injections  = [];\n\t\tthis.__main        = [];\n\n\n\t\tthis.setSandbox(settings.sandbox);\n\t\tthis.setSettings(settings.settings);\n\n\n\t\t_Flow.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('init', function(oncomplete) {\n\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet stash   = this.stash;\n\n\t\t\tif (sandbox !== '' && stash !== null) {\n\n\t\t\t\tconsole.log('breeder: INIT');\n\n\n\t\t\t\t_STASH.bind('batch', function(type, assets) {\n\n\t\t\t\t\tlet pkg  = assets.find(function(asset) {\n\t\t\t\t\t\treturn asset.url === _ASSET + '/lychee.pkg';\n\t\t\t\t\t}) || null;\n\t\t\t\t\tlet urls = assets.map(function(asset) {\n\t\t\t\t\t\treturn sandbox + asset.url.substr(_ASSET.length);\n\t\t\t\t\t});\n\n\n\t\t\t\t\tif (pkg !== null) {\n\n\t\t\t\t\t\tlet tmp = JSON.stringify(pkg.buffer, null, '\\t');\n\n\t\t\t\t\t\ttmp = tmp.replaceObject({\n\t\t\t\t\t\t\tid: sandbox\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\tpkg.buffer = JSON.parse(tmp);\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tstash.bind('batch', function(action, woop) {\n\n\t\t\t\t\t\tif (action === 'write') {\n\t\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}, this, true);\n\n\t\t\t\t\tstash.batch('write', urls, assets);\n\n\t\t\t\t}, this, true);\n\n\t\t\t\t_STASH.batch('read', [\n\n\t\t\t\t\t_ASSET + '/harvester.js',\n\t\t\t\t\t_ASSET + '/icon.png',\n\t\t\t\t\t_ASSET + '/index.html',\n\t\t\t\t\t_ASSET + '/lychee.pkg',\n\n\t\t\t\t\t_ASSET + '/source/Main.js',\n\t\t\t\t\t_ASSET + '/source/net/Client.js',\n\t\t\t\t\t_ASSET + '/source/net/Server.js',\n\t\t\t\t\t_ASSET + '/source/net/client/Ping.js',\n\t\t\t\t\t_ASSET + '/source/net/remote/Ping.js',\n\t\t\t\t\t_ASSET + '/source/state/Welcome.js',\n\t\t\t\t\t_ASSET + '/source/state/Welcome.json'\n\n\t\t\t\t]);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('fork', function(oncomplete) {\n\n\t\t\tlet library = this.settings.library;\n\t\t\tlet project = this.settings.project;\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet stash   = this.stash;\n\t\t\tlet urls    = [];\n\t\t\tlet assets  = [];\n\t\t\tlet pkg     = new Config(library + '/lychee.pkg');\n\t\t\tlet folder  = project.split('/')[1];\n\n\n\t\t\tconsole.log('breeder: FORK');\n\n\n\t\t\tpkg.onload = function() {\n\n\t\t\t\tif (this.buffer instanceof Object && this.buffer.build instanceof Object) {\n\n\t\t\t\t\tlet environments = this.buffer.build.environments || {};\n\n\t\t\t\t\tif (folder === 'projects') {\n\n\t\t\t\t\t\tObject.keys(environments).forEach(function(identifier) {\n\n\t\t\t\t\t\t\tif (/main$/g.test(identifier) === false) {\n\t\t\t\t\t\t\t\tdelete environments[identifier];\n\t\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\t\tlet tmp = environments[identifier];\n\t\t\t\t\t\t\t\tif (tmp.profile instanceof Object) {\n\n\t\t\t\t\t\t\t\t\tif (typeof tmp.profile.client === 'string') {\n\t\t\t\t\t\t\t\t\t\ttmp.profile.client = tmp.profile.client.replace(library, project);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\tif (typeof tmp.profile.server === 'string') {\n\t\t\t\t\t\t\t\t\t\ttmp.profile.server = tmp.profile.server.replace(library, project);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\ttmp.variant  = 'application';\n\t\t\t\t\t\t\t\ttmp.packages = [\n\t\t\t\t\t\t\t\t\t[ 'fork', './lychee.pkg' ],\n\t\t\t\t\t\t\t\t\t[ 'app',  library + '/lychee.pkg' ]\n\t\t\t\t\t\t\t\t];\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t_CONFIG.buffer.build.environments = environments;\n\n\n\t\t\t\t\t\tif (typeof environments['node/main'] !== 'undefined') {\n\t\t\t\t\t\t\turls.push(project + '/harvester.js');\n\t\t\t\t\t\t\tassets.push(_TEMPLATE.harvester);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\turls.push(sandbox + '/lychee.pkg');\n\t\t\t\t\t\turls.push(sandbox + '/index.html');\n\t\t\t\t\t\turls.push(sandbox + '/source/Main.js');\n\n\t\t\t\t\t\tassets.push(_CONFIG);\n\t\t\t\t\t\tassets.push(_TEMPLATE.index);\n\t\t\t\t\t\tassets.push(_TEMPLATE.main);\n\n\t\t\t\t\t} else if (folder === 'libraries') {\n\n\t\t\t\t\t\tObject.keys(environments).forEach(function(identifier) {\n\n\t\t\t\t\t\t\tif (/dist$/g.test(identifier) === false) {\n\t\t\t\t\t\t\t\tdelete environments[identifier];\n\t\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\t\tlet tmp = environments[identifier];\n\n\t\t\t\t\t\t\t\ttmp.variant  = 'library';\n\t\t\t\t\t\t\t\ttmp.packages = [\n\t\t\t\t\t\t\t\t\t[ 'fork', './lychee.pkg' ],\n\t\t\t\t\t\t\t\t\t[ 'app',  library + '/lychee.pkg' ]\n\t\t\t\t\t\t\t\t];\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t_CONFIG.buffer.build.environments = environments;\n\n\n\t\t\t\t\t\turls.push(sandbox + '/lychee.pkg');\n\t\t\t\t\t\turls.push(sandbox + '/source/DIST.js');\n\t\t\t\t\t\turls.push(sandbox + '/source/Main.js');\n\n\t\t\t\t\t\tassets.push(_CONFIG);\n\t\t\t\t\t\tassets.push(_TEMPLATE.dist);\n\t\t\t\t\t\tassets.push(_TEMPLATE.main);\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tstash.bind('batch', function(action, map) {\n\n\t\t\t\t\t\tif (action === 'write') {\n\t\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}, this, true);\n\n\t\t\t\t\tstash.batch('write', urls, assets);\n\n\t\t\t\t} else {\n\n\t\t\t\t\toncomplete(false);\n\n\t\t\t\t}\n\n\t\t\t};\n\n\t\t\tpkg.load();\n\n\t\t}, this);\n\n\t\tthis.bind('pull', function(oncomplete) {\n\n\t\t\tlet library = this.settings.library;\n\t\t\tlet stash   = this.stash;\n\n\n\t\t\tif (library !== null && stash !== null) {\n\n\t\t\t\tconsole.log('breeder: PULL ' + library);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\n\n\t\t\t\t_STASH.bind('batch', function(type, assets) {\n\n\t\t\t\t\tlet main = assets.filter(function(asset) {\n\t\t\t\t\t\treturn /index\\.html|harvester\\.js/g.test(asset.url);\n\t\t\t\t\t});\n\t\t\t\t\tlet pkg  = assets.find(function(asset) {\n\t\t\t\t\t\treturn /lychee\\.pkg/g.test(asset.url);\n\t\t\t\t\t}) || null;\n\n\n\t\t\t\t\tif (main.length > 0 && pkg !== null) {\n\n\t\t\t\t\t\tlet platforms = [];\n\n\t\t\t\t\t\tObject.values(pkg.buffer.build.environments).forEach(function(environment) {\n\n\t\t\t\t\t\t\tlet tags = environment.tags || null;\n\t\t\t\t\t\t\tif (tags instanceof Object) {\n\n\t\t\t\t\t\t\t\tif (tags.platform instanceof Array) {\n\n\t\t\t\t\t\t\t\t\ttags.platform.forEach(function(val) {\n\n\t\t\t\t\t\t\t\t\t\tif (platforms.indexOf(val) === -1) {\n\t\t\t\t\t\t\t\t\t\t\tplatforms.push(val);\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\tif (platforms.length > 0) {\n\n\t\t\t\t\t\t\tlet injections = platforms.sort().map(function(platform) {\n\t\t\t\t\t\t\t\treturn library + '/build/' + platform + '/dist/index.js';\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\tlet tmp_stash  = new _Stash({\n\t\t\t\t\t\t\t\ttype: _Stash.TYPE.temporary\n\t\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\t\ttmp_stash.bind('batch', function(type, assets) {\n\n\t\t\t\t\t\t\t\tfor (let a = 0, al = assets.length; a < al; a++) {\n\n\t\t\t\t\t\t\t\t\tlet asset = assets[a];\n\t\t\t\t\t\t\t\t\tif (asset.buffer !== null && asset.buffer !== '') {\n\t\t\t\t\t\t\t\t\t\tstash.write('.' + asset.url, asset);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\ttmp_stash.batch('read', injections);\n\n\t\t\t\t\t\t\tthis.__injections = injections;\n\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tthis.__main = main;\n\n\t\t\t\t\t\tsetTimeout(function() {\n\n\t\t\t\t\t\t\tthis.trigger('pull-inject', [ function(result) {\n\t\t\t\t\t\t\t\toncomplete(result);\n\t\t\t\t\t\t\t} ]);\n\n\t\t\t\t\t\t}.bind(this), 500);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t}, this, true);\n\n\n\t\t\t\t_STASH.batch('read', [\n\t\t\t\t\tsandbox + '/harvester.js',\n\t\t\t\t\tsandbox + '/index.html',\n\t\t\t\t\tsandbox + '/lychee.pkg'\n\t\t\t\t]);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t});\n\n\n\t\tthis.bind('pull-inject', function(oncomplete) {\n\n\t\t\tlet injections = this.__injections;\n\t\t\tlet main       = this.__main;\n\t\t\tlet stash      = this.stash;\n\n\n\t\t\tif (injections.length > 0 && main.length > 0 && stash !== null) {\n\n\t\t\t\tfor (let m = 0, ml = main.length; m < ml; m++) {\n\n\t\t\t\t\tlet tmp = main[m];\n\t\t\t\t\tif (tmp.buffer !== null) {\n\n\t\t\t\t\t\tconsole.log('breeder: PULL-INJECT ' + tmp.url);\n\n\n\t\t\t\t\t\ttmp.buffer = _inject(tmp.buffer, injections);\n\n\t\t\t\t\t\tstash.write(tmp.url, tmp);\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\tsetTimeout(function() {\n\t\t\t\t\toncomplete(true);\n\t\t\t\t}, 500);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(true);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tlet stash = lychee.deserialize(blob.stash);\n\t\t\tif (stash !== null) {\n\t\t\t\tthis.stash = stash;\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Flow.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'breeder.Template';\n\n\n\t\t\tlet settings = data['arguments'][0] || {};\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tif (this.sandbox !== '') settings.sandbox = this.sandbox;\n\n\n\t\t\tif (this.stash !== null) blob.stash = lychee.serialize(this.stash);\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetSandbox: function(sandbox) {\n\n\t\t\tsandbox = typeof sandbox === 'string' ? sandbox : null;\n\n\n\t\t\tif (sandbox !== null) {\n\n\t\t\t\tthis.sandbox = sandbox;\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSettings: function(settings) {\n\n\t\t\tsettings = settings instanceof Object ? settings : null;\n\n\n\t\t\tif (settings !== null) {\n\n\t\t\t\tthis.settings = settings;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}}},"features":{"process":{"stdin":{"on":"function"}},"require":"function"}}});
+	let environment = lychee.deserialize({"constructor":"lychee.Environment","arguments":[{"id":"/libraries/breeder/dist","build":"breeder.Main","debug":false,"sandbox":false,"timeout":5000,"type":"build","tags":{"platform":["node"]}}],"blob":{"definitions":{"breeder.Main":{"constructor":"lychee.Definition","arguments":["breeder.Main"],"blob":{"attaches":{},"requires":["lychee.Input","breeder.Template"],"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _lychee   = lychee.import('lychee');\n\tconst _Emitter  = lychee.import('lychee.event.Emitter');\n\tconst _Input    = lychee.import('lychee.Input');\n\tconst _Template = lychee.import('breeder.Template');\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(settings) {\n\n\t\tthis.settings = _lychee.assignunlink({\n\t\t\taction:  null,\n\t\t\tproject: null,\n\t\t\tlibrary: null\n\t\t}, settings);\n\n\t\tthis.defaults = _lychee.assignunlink({\n\t\t\taction:  null,\n\t\t\tproject: null,\n\t\t\tlibrary: null\n\t\t}, this.settings);\n\n\n\t\t_Emitter.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('load', function() {\n\n\t\t\tlet action  = this.settings.action  || null;\n\t\t\tlet project = this.settings.project || null;\n\n\t\t\tif (action !== null && project !== null) {\n\n\t\t\t\tlychee.ROOT.project                           = _lychee.ROOT.lychee + project;\n\t\t\t\tlychee.environment.global.lychee.ROOT.project = _lychee.ROOT.lychee + project;\n\n\n\t\t\t\tthis.trigger('init', [ project, action ]);\n\n\t\t\t} else {\n\n\t\t\t\tconsole.error('breeder: FAILURE (\"' + project + '\") at \"load\" event');\n\n\n\t\t\t\tthis.destroy(1);\n\n\t\t\t}\n\n\t\t}, this, true);\n\n\t\tthis.bind('init', function(project, action) {\n\n\t\t\tlet template = new _Template({\n\t\t\t\tsandbox:  project,\n\t\t\t\tsettings: this.settings\n\t\t\t});\n\n\n\t\t\ttemplate.then(action);\n\n\t\t\ttemplate.bind('complete', function() {\n\n\t\t\t\tif (lychee.debug === true) {\n\t\t\t\t\tconsole.info('breeder: SUCCESS (\"' + project + '\")');\n\t\t\t\t}\n\n\t\t\t\tthis.destroy();\n\n\t\t\t}, this);\n\n\t\t\ttemplate.bind('error', function(event) {\n\n\t\t\t\tif (lychee.debug === true) {\n\t\t\t\t\tconsole.error('breeder: FAILURE (\"' + project + '\") at \"' + event + '\" template event');\n\t\t\t\t}\n\n\t\t\t\tthis.destroy();\n\n\t\t\t}, this);\n\n\n\t\t\ttemplate.init();\n\n\t\t\treturn true;\n\n\t\t}, this, true);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'breeder.Main';\n\n\n\t\t\tlet settings = _lychee.assignunlink({}, this.settings);\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * MAIN API\n\t\t */\n\n\t\tinit: function() {\n\n\t\t\tthis.trigger('load');\n\n\t\t\treturn true;\n\n\t\t},\n\n\t\tdestroy: function(code) {\n\n\t\t\tcode = typeof code === 'number' ? code : 0;\n\n\n\t\t\tthis.trigger('destroy', [ code ]);\n\n\t\t\treturn true;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Emitter":{"constructor":"lychee.Definition","arguments":["lychee.event.Emitter"],"blob":{"attaches":{},"exports":"function (lychee, global, attachments) {\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _bind = function(event, callback, scope, once) {\n\n\t\tif (event === null || callback === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet pass_event = false;\n\t\tlet pass_self  = false;\n\n\t\tlet modifier = event.charAt(0);\n\t\tif (modifier === '@') {\n\n\t\t\tevent      = event.substr(1, event.length - 1);\n\t\t\tpass_event = true;\n\n\t\t} else if (modifier === '#') {\n\n\t\t\tevent     = event.substr(1, event.length - 1);\n\t\t\tpass_self = true;\n\n\t\t}\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: pass_event,\n\t\t\tpass_self:  pass_self,\n\t\t\tcallback:   callback,\n\t\t\tscope:      scope,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _relay = function(event, instance, once) {\n\n\t\tif (event === null || instance === null) {\n\t\t\treturn false;\n\t\t}\n\n\n\t\tlet callback = function() {\n\n\t\t\tlet event = arguments[0];\n\t\t\tlet data  = [];\n\n\t\t\tfor (let a = 1, al = arguments.length; a < al; a++) {\n\t\t\t\tdata.push(arguments[a]);\n\t\t\t}\n\n\t\t\tthis.trigger(event, data);\n\n\t\t};\n\n\n\t\tif (this.___events[event] === undefined) {\n\t\t\tthis.___events[event] = [];\n\t\t}\n\n\n\t\tthis.___events[event].push({\n\t\t\tpass_event: true,\n\t\t\tpass_self:  false,\n\t\t\tcallback:   callback,\n\t\t\tscope:      instance,\n\t\t\tonce:       once\n\t\t});\n\n\n\t\treturn true;\n\n\t};\n\n\tconst _trigger = function(event, data) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet value = undefined;\n\n\t\t\tfor (let e = 0; e < this.___events[event].length; e++) {\n\n\t\t\t\tlet args  = [];\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif (entry.pass_event === true) {\n\n\t\t\t\t\targs.push(event);\n\n\t\t\t\t} else if (entry.pass_self === true) {\n\n\t\t\t\t\targs.push(this);\n\n\t\t\t\t}\n\n\n\t\t\t\tif (data !== null) {\n\t\t\t\t\targs.push.apply(args, data);\n\t\t\t\t}\n\n\n\t\t\t\tlet result = entry.callback.apply(entry.scope, args);\n\t\t\t\tif (result !== undefined) {\n\t\t\t\t\tvalue = result;\n\t\t\t\t}\n\n\n\t\t\t\tif (entry.once === true) {\n\n\t\t\t\t\tif (this.unbind(event, entry.callback, entry.scope) === true) {\n\t\t\t\t\t\te--;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (value !== undefined) {\n\t\t\t\treturn value;\n\t\t\t} else {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _unbind = function(event, callback, scope) {\n\n\t\tlet found = false;\n\n\t\tif (event !== null) {\n\n\t\t\tfound = _unbind_event.call(this, event, callback, scope);\n\n\t\t} else {\n\n\t\t\tfor (event in this.___events) {\n\n\t\t\t\tlet result = _unbind_event.call(this, event, callback, scope);\n\t\t\t\tif (result === true) {\n\t\t\t\t\tfound = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn found;\n\n\t};\n\n\tconst _unbind_event = function(event, callback, scope) {\n\n\t\tif (this.___events !== undefined && this.___events[event] !== undefined) {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\tif ((callback === null || entry.callback === callback) && (scope === null || entry.scope === scope)) {\n\n\t\t\t\t\tfound = true;\n\n\t\t\t\t\tthis.___events[event].splice(e, 1);\n\t\t\t\t\tel--;\n\t\t\t\t\te--;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn found;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___events   = {};\n\t\tthis.___timeline = {\n\t\t\tbind:    [],\n\t\t\ttrigger: [],\n\t\t\trelay:   [],\n\t\t\tunbind:  []\n\t\t};\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.events instanceof Object) {\n\t\t\t\t// TODO: deserialize events\n\t\t\t}\n\n\t\t\tif (blob.timeline instanceof Object) {\n\t\t\t\t// TODO: deserialize timeline\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet blob = {};\n\n\n\t\t\tif (Object.keys(this.___events).length > 0) {\n\n\t\t\t\tblob.events = {};\n\n\t\t\t\tfor (let event in this.___events) {\n\n\t\t\t\t\tblob.events[event] = [];\n\n\t\t\t\t\tfor (let e = 0, el = this.___events[event].length; e < el; e++) {\n\n\t\t\t\t\t\tlet entry = this.___events[event][e];\n\n\t\t\t\t\t\tblob.events[event].push({\n\t\t\t\t\t\t\tpass_event: entry.pass_event,\n\t\t\t\t\t\t\tpass_self:  entry.pass_self,\n\t\t\t\t\t\t\tcallback:   lychee.serialize(entry.callback),\n\t\t\t\t\t\t\t// scope:      lychee.serialize(entry.scope),\n\t\t\t\t\t\t\tscope:      null,\n\t\t\t\t\t\t\tonce:       entry.once\n\t\t\t\t\t\t});\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (this.___timeline.bind.length > 0 || this.___timeline.trigger.length > 0 || this.___timeline.unbind.length > 0) {\n\n\t\t\t\tblob.timeline = {};\n\n\n\t\t\t\tif (this.___timeline.bind.length > 0) {\n\n\t\t\t\t\tblob.timeline.bind = [];\n\n\t\t\t\t\tfor (let b = 0, bl = this.___timeline.bind.length; b < bl; b++) {\n\t\t\t\t\t\tblob.timeline.bind.push(this.___timeline.bind[b]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.trigger.length > 0) {\n\n\t\t\t\t\tblob.timeline.trigger = [];\n\n\t\t\t\t\tfor (let t = 0, tl = this.___timeline.trigger.length; t < tl; t++) {\n\t\t\t\t\t\tblob.timeline.trigger.push(this.___timeline.trigger[t]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\tif (this.___timeline.unbind.length > 0) {\n\n\t\t\t\t\tblob.timeline.unbind = [];\n\n\t\t\t\t\tfor (let u = 0, ul = this.___timeline.unbind.length; u < ul; u++) {\n\t\t\t\t\t\tblob.timeline.unbind.push(this.___timeline.unbind[u]);\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn {\n\t\t\t\t'constructor': 'lychee.event.Emitter',\n\t\t\t\t'arguments':   [],\n\t\t\t\t'blob':        Object.keys(blob).length > 0 ? blob : null\n\t\t\t};\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbind: function(event, callback, scope, once) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : this;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _bind.call(this, event, callback, scope, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.bind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope),\n\t\t\t\t\tscope:    null,\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\trelay: function(event, instance, once) {\n\n\t\t\tevent    = typeof event === 'string'               ? event    : null;\n\t\t\tinstance = lychee.interfaceof(Composite, instance) ? instance : null;\n\t\t\tonce     = once === true;\n\n\n\t\t\tlet result = _relay.call(this, event, instance, once);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.relay.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tinstance: lychee.serialize(instance),\n\t\t\t\t\tonce:     once\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\ttrigger: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tlet result = _trigger.call(this, event, data);\n\t\t\tif (result === true && lychee.debug === true) {\n\n\t\t\t\tthis.___timeline.trigger.push({\n\t\t\t\t\ttime:  Date.now(),\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  lychee.serialize(data)\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tunbind: function(event, callback, scope) {\n\n\t\t\tevent    = typeof event === 'string'    ? event    : null;\n\t\t\tcallback = callback instanceof Function ? callback : null;\n\t\t\tscope    = scope !== undefined          ? scope    : null;\n\n\n\t\t\tlet result = _unbind.call(this, event, callback, scope);\n\t\t\tif (result === true) {\n\n\t\t\t\tthis.___timeline.unbind.push({\n\t\t\t\t\ttime:     Date.now(),\n\t\t\t\t\tevent:    event,\n\t\t\t\t\tcallback: lychee.serialize(callback),\n\t\t\t\t\t// scope:    lychee.serialize(scope)\n\t\t\t\t\tscope:    null\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Input":{"constructor":"lychee.Definition","arguments":["lychee.Input"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (\n\t\ttypeof global.process !== 'undefined'\n\t\t&& typeof global.process.stdin === 'object'\n\t\t&& typeof global.process.stdin.on === 'function'\n\t) {\n\t\treturn true;\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tconst _process   = global.process;\n\tconst _Emitter   = lychee.import('lychee.event.Emitter');\n\tconst _INSTANCES = [];\n\n\n\n\t/*\n\t * EVENTS\n\t */\n\n\tconst _listeners = {\n\n\t\tkeypress: function(key) {\n\n\t\t\t// TTY conform behaviour\n\t\t\tif (key.ctrl === true && key.name === 'c') {\n\n\t\t\t\tkey.name  = 'escape';\n\t\t\t\tkey.ctrl  = false;\n\t\t\t\tkey.alt   = false;\n\t\t\t\tkey.shift = false;\n\n\t\t\t}\n\n\n\t\t\tfor (let i = 0, l = _INSTANCES.length; i < l; i++) {\n\t\t\t\t_process_key.call(_INSTANCES[i], key.name, key.ctrl, key.meta, key.shift);\n\t\t\t}\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tlet keypress = true;\n\t\tif (keypress === true) {\n\t\t\t_process.stdin.on('keypress', _listeners.keypress);\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (keypress) methods.push('Keyboard');\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Input: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Input: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_key = function(key, ctrl, alt, shift) {\n\n\t\tif (this.key === false) {\n\n\t\t\treturn false;\n\n\t\t} else if (this.keymodifier === false) {\n\n\t\t\tif (key === 'ctrl' || key === 'meta' || key === 'shift') {\n\t\t\t\treturn true;\n\t\t\t}\n\n\t\t}\n\n\n\t\tlet name    = '';\n\t\tlet handled = false;\n\t\tlet delta   = Date.now() - this.__clock.key;\n\n\t\tif (delta < this.delay) {\n\t\t\treturn true;\n\t\t} else {\n\t\t\tthis.__clock.key = Date.now();\n\t\t}\n\n\n\t\t// 0. Computation: Normal Characters\n\t\tif (ctrl  === true) name += 'ctrl-';\n\t\tif (alt   === true) name += 'alt-';\n\t\tif (shift === true) name += 'shift-';\n\n\t\tname += key.toLowerCase();\n\n\n\t\t// 1. Event API\n\t\tif (key !== null) {\n\n\t\t\t// allow bind('key') and bind('ctrl-a');\n\n\t\t\thandled = this.trigger('key', [ key, name, delta ]) || handled;\n\t\t\thandled = this.trigger(name,  [ delta ])            || handled;\n\n\t\t}\n\n\n\t\treturn handled;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.delay       = 0;\n\t\tthis.key         = false;\n\t\tthis.keymodifier = false;\n\t\tthis.touch       = false;\n\t\tthis.swipe       = false;\n\n\t\tthis.__clock  = {\n\t\t\tkey:   Date.now(),\n\t\t\ttouch: Date.now(),\n\t\t\tswipe: Date.now()\n\t\t};\n\n\n\t\tthis.setDelay(settings.delay);\n\t\tthis.setKey(settings.key);\n\t\tthis.setKeyModifier(settings.keymodifier);\n\t\tthis.setTouch(settings.touch);\n\t\tthis.setSwipe(settings.swipe);\n\n\n\t\t_Emitter.call(this);\n\n\t\t_INSTANCES.push(this);\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\tdestroy: function() {\n\n\t\t\tlet found = false;\n\n\t\t\tfor (let i = 0, il = _INSTANCES.length; i < il; i++) {\n\n\t\t\t\tif (_INSTANCES[i] === this) {\n\t\t\t\t\t_INSTANCES.splice(i, 1);\n\t\t\t\t\tfound = true;\n\t\t\t\t\til--;\n\t\t\t\t\ti--;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tthis.unbind();\n\n\n\t\t\treturn found;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Input';\n\n\t\t\tlet settings = {};\n\n\n\t\t\tif (this.delay !== 0)           settings.delay       = this.delay;\n\t\t\tif (this.key !== false)         settings.key         = this.key;\n\t\t\tif (this.keymodifier !== false) settings.keymodifier = this.keymodifier;\n\t\t\tif (this.touch !== false)       settings.touch       = this.touch;\n\t\t\tif (this.swipe !== false)       settings.swipe       = this.swipe;\n\n\n\t\t\tdata['arguments'][0] = settings;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetDelay: function(delay) {\n\n\t\t\tdelay = typeof delay === 'number' ? delay : null;\n\n\n\t\t\tif (delay !== null) {\n\n\t\t\t\tthis.delay = delay;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKey: function(key) {\n\n\t\t\tkey = typeof key === 'boolean' ? key : null;\n\n\n\t\t\tif (key !== null) {\n\n\t\t\t\tthis.key = key;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetKeyModifier: function(keymodifier) {\n\n\t\t\tkeymodifier = typeof keymodifier === 'boolean' ? keymodifier : null;\n\n\n\t\t\tif (keymodifier !== null) {\n\n\t\t\t\tthis.keymodifier = keymodifier;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetTouch: function(touch) {\n\n\t\t\ttouch = typeof touch === 'boolean' ? touch : null;\n\n\n\t\t\tif (touch !== null) {\n\n\t\t\t\t// XXX: No touch support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetScroll: function(scroll) {\n\n\t\t\tscroll = typeof scroll === 'boolean' ? scroll : null;\n\n\n\t\t\tif (scroll !== null) {\n\n\t\t\t\t// XXX: No scroll support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSwipe: function(swipe) {\n\n\t\t\tswipe = typeof swipe === 'boolean' ? swipe : null;\n\n\n\t\t\tif (swipe !== null) {\n\n\t\t\t\t// XXX: No swipe support\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.event.Flow":{"constructor":"lychee.Definition","arguments":["lychee.event.Flow"],"blob":{"attaches":{},"includes":["lychee.event.Emitter"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Emitter = lychee.import('lychee.event.Emitter');\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _process_recursive = function(event, result) {\n\n\t\tif (result === true) {\n\n\t\t\tif (this.___timeout === null) {\n\n\t\t\t\tthis.___timeout = setTimeout(function() {\n\n\t\t\t\t\tthis.___timeout = null;\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t}.bind(this), 0);\n\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('error', [ event ]);\n\n\t\t}\n\n\t};\n\n\tconst _process_stack = function() {\n\n\t\tlet entry = this.___stack.shift() || null;\n\t\tif (entry !== null) {\n\n\t\t\tlet data  = entry.data;\n\t\t\tlet event = entry.event;\n\t\t\tlet args  = [ event, [] ];\n\n\t\t\tif (data !== null) {\n\t\t\t\targs[1].push.apply(args[1], data);\n\t\t\t}\n\n\t\t\targs[1].push(_process_recursive.bind(this, event));\n\n\n\t\t\tlet result = this.trigger.apply(this, args);\n\t\t\tif (result === false) {\n\t\t\t\tthis.trigger('error', [ event ]);\n\t\t\t}\n\n\t\t} else {\n\n\t\t\tthis.trigger('complete');\n\n\t\t}\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function() {\n\n\t\tthis.___init    = false;\n\t\tthis.___stack   = [];\n\t\tthis.___timeout = null;\n\n\t\t_Emitter.call(this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\t// deserialize: function(blob) {},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.event.Flow';\n\n\t\t\tlet blob = (data['blob'] || {});\n\n\n\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\tblob.stack = [];\n\n\t\t\t\tfor (let s = 0, sl = this.___stack.length; s < sl; s++) {\n\n\t\t\t\t\tlet entry = this.___stack[s];\n\n\t\t\t\t\tblob.stack.push({\n\t\t\t\t\t\tevent: entry.event,\n\t\t\t\t\t\tdata:  lychee.serialize(entry.data)\n\t\t\t\t\t});\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['blob'] = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tthen: function(event, data) {\n\n\t\t\tevent = typeof event === 'string' ? event : null;\n\t\t\tdata  = data instanceof Array     ? data  : null;\n\n\n\t\t\tif (event !== null) {\n\n\t\t\t\tthis.___stack.push({\n\t\t\t\t\tevent: event,\n\t\t\t\t\tdata:  data\n\t\t\t\t});\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tinit: function() {\n\n\t\t\tif (this.___init === false) {\n\n\t\t\t\tthis.___init = true;\n\n\n\t\t\t\tif (this.___stack.length > 0) {\n\n\t\t\t\t\t_process_stack.call(this);\n\n\t\t\t\t\treturn true;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"lychee.Stash":{"constructor":"lychee.Definition","arguments":["lychee.Stash"],"blob":{"attaches":{},"tags":{"platform":"node"},"includes":["lychee.event.Emitter"],"supports":"function (lychee, global) {\n\n\tif (typeof global.require === 'function') {\n\n\t\ttry {\n\n\t\t\tglobal.require('fs');\n\n\t\t\treturn true;\n\n\t\t} catch (err) {\n\n\t\t}\n\n\t}\n\n\n\treturn false;\n\n}","exports":"function (lychee, global, attachments) {\n\n\tlet   _id         = 0;\n\tconst _Emitter    = lychee.import('lychee.event.Emitter');\n\tconst _PERSISTENT = {\n\t\tdata: {},\n\t\tread: function() {\n\t\t\treturn null;\n\t\t},\n\t\twrite: function(id, asset) {\n\t\t\treturn false;\n\t\t}\n\t};\n\tconst _TEMPORARY  = {\n\t\tdata: {},\n\t\tread: function() {\n\n\t\t\tif (Object.keys(this.data).length > 0) {\n\t\t\t\treturn this.data;\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\t\twrite: function(id, asset) {\n\n\t\t\tif (asset !== null) {\n\t\t\t\tthis.data[id] = asset;\n\t\t\t} else {\n\t\t\t\tdelete this.data[id];\n\t\t\t}\n\n\t\t\treturn true;\n\n\t\t}\n\t};\n\n\n\n\t/*\n\t * FEATURE DETECTION\n\t */\n\n\t(function() {\n\n\t\tconst _ENCODING = {\n\t\t\t'Config':  'utf8',\n\t\t\t'Font':    'utf8',\n\t\t\t'Music':   'binary',\n\t\t\t'Sound':   'binary',\n\t\t\t'Texture': 'binary',\n\t\t\t'Stuff':   'utf8'\n\t\t};\n\n\n\t\tconst _fs      = global.require('fs');\n\t\tconst _path    = global.require('path');\n\t\tconst _mkdir_p = function(path, mode) {\n\n\t\t\tif (mode === undefined) {\n\t\t\t\tmode = 0o777 & (~process.umask());\n\t\t\t}\n\n\n\t\t\tlet is_directory = false;\n\n\t\t\ttry {\n\n\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\n\t\t\t} catch (err) {\n\n\t\t\t\tif (err.code === 'ENOENT') {\n\n\t\t\t\t\tif (_mkdir_p(_path.dirname(path), mode) === true) {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.mkdirSync(path, mode);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\ttry {\n\t\t\t\t\t\tis_directory = _fs.lstatSync(path).isDirectory();\n\t\t\t\t\t} catch (err) {\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn is_directory;\n\n\t\t};\n\n\n\t\tlet unlink = 'unlinkSync' in _fs;\n\t\tlet write  = 'writeFileSync' in _fs;\n\t\tif (unlink === true && write === true) {\n\n\t\t\t_PERSISTENT.write = function(id, asset) {\n\n\t\t\t\tlet result = false;\n\n\n\t\t\t\tlet path = lychee.environment.resolve(id);\n\t\t\t\tif (path.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\n\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\tlet dir = path.split('/').slice(0, -1).join('/');\n\t\t\t\t\t\tif (dir.substr(0, lychee.ROOT.project.length) === lychee.ROOT.project) {\n\t\t\t\t\t\t\t_mkdir_p(dir);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tlet data = lychee.serialize(asset);\n\t\t\t\t\t\tif (data !== null && data.blob !== null && typeof data.blob.buffer === 'string') {\n\n\t\t\t\t\t\t\tlet encoding = _ENCODING[data.constructor] || _ENCODING['Stuff'];\n\t\t\t\t\t\t\tlet index    = data.blob.buffer.indexOf('base64,') + 7;\n\t\t\t\t\t\t\tif (index > 7) {\n\n\t\t\t\t\t\t\t\tlet buffer = new Buffer(data.blob.buffer.substr(index, data.blob.buffer.length - index), 'base64');\n\n\t\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\t\t_fs.writeFileSync(path, buffer, encoding);\n\t\t\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t_fs.unlinkSync(path);\n\t\t\t\t\t\t\tresult = true;\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\treturn result;\n\n\t\t\t};\n\n\t\t}\n\n\n\t\tif (lychee.debug === true) {\n\n\t\t\tlet methods = [];\n\n\t\t\tif (write && unlink) methods.push('Persistent');\n\t\t\tif (_TEMPORARY)      methods.push('Temporary');\n\n\n\t\t\tif (methods.length === 0) {\n\t\t\t\tconsole.error('lychee.Stash: Supported methods are NONE');\n\t\t\t} else {\n\t\t\t\tconsole.info('lychee.Stash: Supported methods are ' + methods.join(', '));\n\t\t\t}\n\n\t\t}\n\n\t})();\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _validate_asset = function(asset) {\n\n\t\tif (asset instanceof Object && typeof asset.serialize === 'function') {\n\t\t\treturn true;\n\t\t}\n\n\t\treturn false;\n\n\t};\n\n\tconst _on_batch_remove = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(null);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'remove', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_remove);\n\t\t}\n\n\t};\n\n\tconst _on_batch_write = function(stash, others) {\n\n\t\tlet keys = Object.keys(others);\n\n\t\tfor (let k = 0, kl = keys.length; k < kl; k++) {\n\n\t\t\tlet key   = keys[k];\n\t\t\tlet index = this.load.indexOf(key);\n\t\t\tif (index !== -1) {\n\n\t\t\t\tif (this.ready.indexOf(key) === -1) {\n\t\t\t\t\tthis.ready.push(others[key]);\n\t\t\t\t\tthis.load.splice(index, 1);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tif (this.load.length === 0) {\n\t\t\tstash.trigger('batch', [ 'write', this.ready ]);\n\t\t\tstash.unbind('sync', _on_batch_write);\n\t\t}\n\n\t};\n\n\tconst _read_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet blob = null;\n\n\n\t\tlet type = this.type;\n\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\tblob = _PERSISTENT.read();\n\n\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\tblob = _TEMPORARY.read();\n\n\t\t}\n\n\n\t\tif (blob !== null) {\n\n\t\t\tif (Object.keys(this.__assets).length !== Object.keys(blob).length) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob) {\n\t\t\t\t\tthis.__assets[id] = blob[id];\n\t\t\t\t}\n\n\n\t\t\t\tif (silent === false) {\n\t\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\tconst _write_stash = function(silent) {\n\n\t\tsilent = silent === true;\n\n\n\t\tlet operations = this.__operations;\n\t\tlet filtered   = {};\n\n\t\tif (operations.length !== 0) {\n\n\t\t\twhile (operations.length > 0) {\n\n\t\t\t\tlet operation = operations.shift();\n\t\t\t\tif (operation.type === 'update') {\n\n\t\t\t\t\tfiltered[operation.id] = operation.asset;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== operation.asset) {\n\t\t\t\t\t\tthis.__assets[operation.id] = operation.asset;\n\t\t\t\t\t}\n\n\t\t\t\t} else if (operation.type === 'remove') {\n\n\t\t\t\t\tfiltered[operation.id] = null;\n\n\t\t\t\t\tif (this.__assets[operation.id] !== null) {\n\t\t\t\t\t\tthis.__assets[operation.id] = null;\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tlet type = this.type;\n\t\t\tif (type === Composite.TYPE.persistent) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_PERSISTENT.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t} else if (type === Composite.TYPE.temporary) {\n\n\t\t\t\tfor (let id in filtered) {\n\t\t\t\t\t_TEMPORARY.write(id, filtered[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (silent === false) {\n\t\t\t\tthis.trigger('sync', [ this.__assets ]);\n\t\t\t}\n\n\n\t\t\treturn true;\n\n\t\t}\n\n\n\t\treturn false;\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.id   = 'lychee-Stash-' + _id++;\n\t\tthis.type = Composite.TYPE.persistent;\n\n\n\t\tthis.__assets     = {};\n\t\tthis.__operations = [];\n\n\n\t\tthis.setId(settings.id);\n\t\tthis.setType(settings.type);\n\n\n\t\t_Emitter.call(this);\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\t_read_stash.call(this);\n\n\n\t\tsettings = null;\n\n\t};\n\n\n\tComposite.TYPE = {\n\t\tpersistent: 0,\n\t\ttemporary:  1\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tsync: function(silent) {\n\n\t\t\tsilent = silent === true;\n\n\n\t\t\tlet result = false;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'sync'\n\t\t\t\t});\n\n\t\t\t}\n\n\n\t\t\tif (this.__operations.length > 0) {\n\t\t\t\tresult = _write_stash.call(this, silent);\n\t\t\t} else {\n\t\t\t\tresult = _read_stash.call(this, silent);\n\t\t\t}\n\n\n\t\t\treturn result;\n\n\t\t},\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tif (blob.assets instanceof Object) {\n\n\t\t\t\tthis.__assets = {};\n\n\t\t\t\tfor (let id in blob.assets) {\n\t\t\t\t\tthis.__assets[id] = lychee.deserialize(blob.assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Emitter.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'lychee.Stash';\n\n\t\t\tlet settings = {};\n\t\t\tlet blob     = (data['blob'] || {});\n\n\n\t\t\tif (this.id.substr(0, 13) !== 'lychee-Stash-') settings.id   = this.id;\n\t\t\tif (this.type !== Composite.TYPE.persistent)   settings.type = this.type;\n\n\n\t\t\tif (Object.keys(this.__assets).length > 0) {\n\n\t\t\t\tblob.assets = {};\n\n\t\t\t\tfor (let id in this.__assets) {\n\t\t\t\t\tblob.assets[id] = lychee.serialize(this.__assets[id]);\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tbatch: function(action, ids, assets) {\n\n\t\t\taction = typeof action === 'string' ? action : null;\n\t\t\tids    = ids instanceof Array       ? ids    : null;\n\t\t\tassets = assets instanceof Array    ? assets : null;\n\n\n\t\t\tif (action !== null) {\n\n\t\t\t\tlet cache  = {\n\t\t\t\t\tload:  [].slice.call(ids),\n\t\t\t\t\tready: []\n\t\t\t\t};\n\n\n\t\t\t\tlet result = true;\n\t\t\t\tlet that   = this;\n\n\t\t\t\tif (action === 'read') {\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tlet asset = this.read(ids[i]);\n\t\t\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\t\t\tasset.onload = function(result) {\n\n\t\t\t\t\t\t\t\tlet index = cache.load.indexOf(this.url);\n\t\t\t\t\t\t\t\tif (index !== -1) {\n\t\t\t\t\t\t\t\t\tcache.ready.push(this);\n\t\t\t\t\t\t\t\t\tcache.load.splice(index, 1);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\tif (cache.load.length === 0) {\n\t\t\t\t\t\t\t\t\tthat.trigger('batch', [ 'read', cache.ready ]);\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t};\n\n\t\t\t\t\t\t\tasset.load();\n\n\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\tresult = false;\n\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'remove') {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_remove, cache);\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tif (this.remove(ids[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_remove);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t} else if (action === 'write' && ids.length === assets.length) {\n\n\t\t\t\t\tthis.bind('#sync', _on_batch_write, cache);\n\n\t\t\t\t\tfor (let i = 0, il = ids.length; i < il; i++) {\n\n\t\t\t\t\t\tif (this.write(ids[i], assets[i]) === false) {\n\t\t\t\t\t\t\tresult = false;\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}\n\n\t\t\t\t\tif (result === false) {\n\t\t\t\t\t\tthis.unbind('sync', _on_batch_write);\n\t\t\t\t\t}\n\n\n\t\t\t\t\treturn result;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tread: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tlet asset = new lychee.Asset(id, null, true);\n\t\t\t\tif (asset !== null) {\n\n\t\t\t\t\tthis.__assets[id] = asset;\n\n\t\t\t\t\treturn asset;\n\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\treturn null;\n\n\t\t},\n\n\t\tremove: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype: 'remove',\n\t\t\t\t\tid:   id\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\twrite: function(id, asset) {\n\n\t\t\tid    = typeof id === 'string'          ? id    : null;\n\t\t\tasset = _validate_asset(asset) === true ? asset : null;\n\n\n\t\t\tif (id !== null && asset !== null) {\n\n\t\t\t\tthis.__operations.push({\n\t\t\t\t\ttype:  'update',\n\t\t\t\t\tid:    id,\n\t\t\t\t\tasset: asset\n\t\t\t\t});\n\n\n\t\t\t\t_write_stash.call(this);\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetId: function(id) {\n\n\t\t\tid = typeof id === 'string' ? id : null;\n\n\n\t\t\tif (id !== null) {\n\n\t\t\t\tthis.id = id;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetType: function(type) {\n\n\t\t\ttype = lychee.enumof(Composite.TYPE, type) ? type : null;\n\n\n\t\t\tif (type !== null) {\n\n\t\t\t\tthis.type = type;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}},"breeder.Template":{"constructor":"lychee.Definition","arguments":["breeder.Template"],"blob":{"attaches":{"json":{"constructor":"Config","arguments":["/libraries/breeder/source/Template.json"],"blob":{"buffer":"data:application/json;base64,ewoJImFwaSI6IHsKCQkiZmlsZXMiOiB7fQoJfSwKCSJidWlsZCI6IHsKCQkiZW52aXJvbm1lbnRzIjoge30sCgkJImZpbGVzIjoge30KCX0sCgkic291cmNlIjogewoJCSJlbnZpcm9ubWVudHMiOiB7fSwKCQkidGFncyI6IHt9LAoJCSJmaWxlcyI6IHsKCQkJIkRJU1QiOiBbCgkJCQkianMiCgkJCV0sCgkJCSJNYWluIjogWwoJCQkJImpzIgoJCQldCgkJfQoJfQp9"}},"dist.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.dist.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Cmx5Y2hlZS5kZWZpbmUoJ2ZvcmsuRElTVCcpLnJlcXVpcmVzKFsKCSdhcHAuTWFpbicKXSkuZXhwb3J0cyhmdW5jdGlvbihseWNoZWUsIGdsb2JhbCwgYXR0YWNobWVudHMpIHsKCglsZXQgQ29tcG9zaXRlID0gZnVuY3Rpb24oKSB7fTsKCglDb21wb3NpdGUucHJvdG90eXBlID0gewoKCX07CgoJcmV0dXJuIENvbXBvc2l0ZTsKCn0pOwoK"}},"harvester.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.harvester.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,IyEvdXNyL2xvY2FsL2Jpbi9seWNoZWVqcy1oZWxwZXIgZW52Om5vZGUKCmNvbnN0IF9QT1JUID0gcGFyc2VJbnQocHJvY2Vzcy5hcmd2WzJdLCAxMCk7CmNvbnN0IF9IT1NUID0gcHJvY2Vzcy5hcmd2WzNdID09PSAnbnVsbCcgPyBudWxsIDogcHJvY2Vzcy5hcmd2WzNdOwoKcmVxdWlyZSgnL29wdC9seWNoZWVqcy9saWJyYXJpZXMvbHljaGVlL2J1aWxkL25vZGUvY29yZS5qcycpKF9fZGlybmFtZSk7CgoKCi8qCiAqIElOSVRJQUxJWkFUSU9OCiAqLwoKKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJbHljaGVlLnBrZ2luaXQoJ25vZGUvbWFpbicsIHsKCQlkZWJ1ZzogICBmYWxzZSwKCQlzYW5kYm94OiBmYWxzZQoJfSwgewoJCXJlbmRlcmVyOiBudWxsLAoJCWNsaWVudDogICBudWxsLAoJCXNlcnZlcjogICB7CgkJCWhvc3Q6IF9IT1NULAoJCQlwb3J0OiBfUE9SVAoJCX0KCX0pOwoKfSkobHljaGVlLCB0eXBlb2YgZ2xvYmFsICE9PSAndW5kZWZpbmVkJyA/IGdsb2JhbCA6IHRoaXMpOwoK"}},"index.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.index.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,PCFET0NUWVBFIGh0bWw+CjxodG1sPgo8aGVhZD4KCTx0aXRsZT5seWNoZWUuanMgRm9yayBCb2lsZXJwbGF0ZTwvdGl0bGU+Cgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEsIG1pbmltdW0tc2NhbGU9MSwgbWF4aW11bS1zY2FsZT0xLCB1c2VyLXNjYWxhYmxlPW5vIj4KCTxtZXRhIG5hbWU9ImFwcGxlLW1vYmlsZS13ZWItYXBwLWNhcGFibGUiIGNvbnRlbnQ9InllcyI+Cgk8bWV0YSBuYW1lPSJhcHBsZS1tb2JpbGUtd2ViLWFwcC1zdGF0dXMtYmFyLXN0eWxlIiBjb250ZW50PSJibGFjay10cmFuc2x1Y2VudCI+Cgk8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiIC8+CgoJPCEtLSBCT09UU1RSQVAgLS0+Cgk8c2NyaXB0IHNyYz0iL2xpYnJhcmllcy9seWNoZWUvYnVpbGQvaHRtbC9jb3JlLmpzIj48L3NjcmlwdD4KCgk8c3R5bGU+CgkJYm9keSB7CgkJCW1hcmdpbjogMDsKCQkJcGFkZGluZzogMDsKCQkJb3ZlcmZsb3c6IGhpZGRlbjsKCQl9CgkJCgkJLmx5Y2hlZS1SZW5kZXJlciB7CgkJCWRpc3BsYXk6IGJsb2NrOwoJCQltYXJnaW46IDAgYXV0bzsKCQkJdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS1tb3otdXNlci1zZWxlY3Q6IG5vbmU7CgkJCS1tcy11c2VyLXNlbGVjdDogbm9uZTsKCQkJLXdlYmtpdC11c2VyLXNlbGVjdDogbm9uZTsKCQl9IAoJPC9zdHlsZT4KCjwvaGVhZD4KPGJvZHk+Cgk8c2NyaXB0PgoJKGZ1bmN0aW9uKGx5Y2hlZSwgZ2xvYmFsKSB7CgoJCWx5Y2hlZS5wa2dpbml0KCdodG1sL21haW4nLCB7CgkJCWRlYnVnOiAgIGZhbHNlLAoJCQlzYW5kYm94OiBmYWxzZQoJCX0sIHsKCQl9KTsKCgl9KShseWNoZWUsIHR5cGVvZiBnbG9iYWwgIT09ICd1bmRlZmluZWQnID8gZ2xvYmFsIDogdGhpcyk7Cgk8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+ICAgIAo="}},"main.tpl":{"constructor":"Stuff","arguments":["/libraries/breeder/source/Template.main.tpl"],"blob":{"buffer":"data:application/octet-stream;base64,Cmx5Y2hlZS5kZWZpbmUoJ2ZvcmsuTWFpbicpLnJlcXVpcmVzKFsKCSdhcHAuTWFpbicsCl0pLmluY2x1ZGVzKFsKCSdseWNoZWUuYXBwLk1haW4nCl0pLmV4cG9ydHMoZnVuY3Rpb24obHljaGVlLCBnbG9iYWwsIGF0dGFjaG1lbnRzKSB7CgoJY29uc3QgX2FwcCAgPSBseWNoZWUuaW1wb3J0KCdhcHAnKTsKCWNvbnN0IF9mb3JrID0gbHljaGVlLmltcG9ydCgnZm9yaycpOwoJY29uc3QgX01haW4gPSBseWNoZWUuaW1wb3J0KCdhcHAuTWFpbicpOwoKCgoJLyoKCSAqIElNUExFTUVOVEFUSU9OCgkgKi8KCglsZXQgQ29tcG9zaXRlID0gZnVuY3Rpb24oZGF0YSkgewoKCQlsZXQgc2V0dGluZ3MgPSBPYmplY3QuYXNzaWduKHsKCQkJLyogQ1VTVE9NIFNFVFRJTkdTICovCgkJfSwgZGF0YSk7CgoKCQlfTWFpbi5jYWxsKHRoaXMsIHNldHRpbmdzKTsKCgl9OwoKCglDb21wb3NpdGUucHJvdG90eXBlID0gewoKCQkvKgoJCSAqIEVOVElUWSBBUEkKCQkgKi8KCgkJLy8gZGVzZXJpYWxpemU6IGZ1bmN0aW9uKGJsb2IpIHt9LAoKCQlzZXJpYWxpemU6IGZ1bmN0aW9uKCkgewoKCQkJbGV0IGRhdGEgPSBfTWFpbi5wcm90b3R5cGUuc2VyaWFsaXplLmNhbGwodGhpcyk7CgkJCWRhdGFbJ2NvbnN0cnVjdG9yJ10gPSAnZm9yay5NYWluJzsKCgoJCQlyZXR1cm4gZGF0YTsKCgkJfQoKCX07CgoKCXJldHVybiBDb21wb3NpdGU7Cgp9KTsK"}}},"requires":["lychee.Stash"],"includes":["lychee.event.Flow"],"exports":"function (lychee, global, attachments) {\n\n\tconst _Flow   = lychee.import('lychee.event.Flow');\n\tconst _Stash  = lychee.import('lychee.Stash');\n\tconst _ASSET  = '/libraries/breeder/asset';\n\tconst _CONFIG = attachments[\"json\"];\n\tconst _STASH  = new _Stash({\n\t\ttype: _Stash.TYPE.persistent\n\t});\n\tconst _TEMPLATE = {\n\t\tdist:      attachments[\"dist.tpl\"],\n\t\tharvester: attachments[\"harvester.tpl\"],\n\t\tindex:     attachments[\"index.tpl\"],\n\t\tmain:      attachments[\"main.tpl\"]\n\t};\n\n\n\n\t/*\n\t * HELPERS\n\t */\n\n\tconst _inject = function(buffer, injections) {\n\n\t\tlet chunk = '';\n\t\tlet code  = buffer.split('\\n');\n\t\tlet c     = 0;\n\t\tlet cl    = code.length;\n\t\tlet found = { include: false, inject: false };\n\t\tlet index = { include: -1,    inject: -1    };\n\t\tlet tmp   = '';\n\t\tlet tmp_s = '';\n\t\tlet tmp_c = '';\n\t\tlet tmp_i = '';\n\t\tlet tpl_s = '';\n\t\tlet tpl_c = '';\n\t\tlet tpl_i = '';\n\n\n\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\tchunk = code[c].trim();\n\n\t\t\tif (chunk.substr(0, 7) === '<script') {\n\n\t\t\t\ttpl_s = '\\t<script src=\"/libraries/';\n\t\t\t\ttpl_c = '\\t<script src=\"${injection}\"></script>';\n\t\t\t\ttpl_i = '\\t\\tlychee.inject(lychee.ENVIRONMENTS[\\'${identifier}\\']);';\n\n\t\t\t\tinjections = injections.filter(function(injection) {\n\t\t\t\t\treturn injection.split('/')[4] === 'html';\n\t\t\t\t});\n\n\t\t\t\tbreak;\n\n\t\t\t} else if (chunk.substr(0, 8) === 'require(') {\n\n\t\t\t\ttpl_s = 'require(\\'/opt/lycheejs/libraries/';\n\t\t\t\ttpl_c = 'require(\\'/opt/lycheejs/${injection}\\');';\n\t\t\t\ttpl_i = '\\tlychee.inject(lychee.ENVIRONMENTS[\\'${identifier}\\']);';\n\n\t\t\t\tinjections = injections.filter(function(injection) {\n\t\t\t\t\treturn injection.split('/')[4] === 'node';\n\t\t\t\t});\n\n\t\t\t\tbreak;\n\n\t\t\t}\n\n\t\t}\n\n\n\t\tfor (let i = 0, il = injections.length; i < il; i++) {\n\n\t\t\tlet injection  = injections[i];\n\t\t\tlet identifier = injection.split('/').slice(0, 3).join('/') + '/' + injection.split('/')[5];\n\n\n\t\t\ttmp_c = tpl_c.replaceObject({\n\t\t\t\tinjection: injection\n\t\t\t});\n\n\t\t\ttmp_i = tpl_i.replaceObject({\n\t\t\t\tidentifier: identifier\n\t\t\t});\n\n\t\t\ttmp_s = tpl_s;\n\n\n\t\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\t\tchunk = code[c].trim();\n\t\t\t\ttmp   = tmp_s.trim();\n\n\n\t\t\t\tif (chunk.substr(0, tmp.length) === tmp) {\n\t\t\t\t\tindex.include = c;\n\t\t\t\t}\n\n\t\t\t\tif (chunk === tmp_c.trim()) {\n\t\t\t\t\tfound.include = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\t\t\tif (found.include === false && index.include >= 0) {\n\t\t\t\tcode.splice(index.include + 1, 0, tmp_c);\n\t\t\t\tcl++;\n\t\t\t}\n\n\n\t\t\tfor (c = 0; c < cl; c++) {\n\n\t\t\t\tchunk = code[c].trim();\n\n\n\t\t\t\tif (chunk.substr(0, 14) === 'lychee.inject(') {\n\t\t\t\t\tindex.inject = c;\n\t\t\t\t} else if (chunk.substr(0, 15) === 'lychee.envinit(' && index.inject === -1) {\n\t\t\t\t\tindex.inject = c - 1;\n\t\t\t\t} else if (chunk.substr(0, 15) === 'lychee.pkginit(' && index.inject === -1) {\n\t\t\t\t\tindex.inject = c - 1;\n\t\t\t\t}\n\n\t\t\t\tif (chunk === tmp_i.trim()) {\n\t\t\t\t\tfound.inject = true;\n\t\t\t\t}\n\n\t\t\t}\n\n\n\t\t\tif (found.inject === false && index.inject >= 0) {\n\t\t\t\tcode.splice(index.inject + 1, 0, tmp_i);\n\t\t\t\tcl++;\n\t\t\t}\n\n\t\t}\n\n\n\t\treturn code.join('\\n');\n\n\t};\n\n\n\n\t/*\n\t * IMPLEMENTATION\n\t */\n\n\tlet Composite = function(data) {\n\n\t\tlet settings = Object.assign({}, data);\n\n\n\t\tthis.sandbox  = '';\n\t\tthis.settings = {};\n\t\tthis.stash    = new _Stash({\n\t\t\ttype: _Stash.TYPE.persistent\n\t\t});\n\n\n\t\tthis.__identifiers = [];\n\t\tthis.__injections  = [];\n\t\tthis.__main        = [];\n\n\n\t\tthis.setSandbox(settings.sandbox);\n\t\tthis.setSettings(settings.settings);\n\n\n\t\t_Flow.call(this);\n\n\t\tsettings = null;\n\n\n\n\t\t/*\n\t\t * INITIALIZATION\n\t\t */\n\n\t\tthis.bind('init', function(oncomplete) {\n\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet stash   = this.stash;\n\n\t\t\tif (sandbox !== '' && stash !== null) {\n\n\t\t\t\tconsole.log('breeder: INIT');\n\n\n\t\t\t\t_STASH.bind('batch', function(type, assets) {\n\n\t\t\t\t\tlet pkg  = assets.find(function(asset) {\n\t\t\t\t\t\treturn asset.url === _ASSET + '/lychee.pkg';\n\t\t\t\t\t}) || null;\n\t\t\t\t\tlet urls = assets.map(function(asset) {\n\t\t\t\t\t\treturn sandbox + asset.url.substr(_ASSET.length);\n\t\t\t\t\t});\n\n\n\t\t\t\t\tif (pkg !== null) {\n\n\t\t\t\t\t\tlet tmp = JSON.stringify(pkg.buffer, null, '\\t');\n\n\t\t\t\t\t\ttmp = tmp.replaceObject({\n\t\t\t\t\t\t\tid: sandbox\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\tpkg.buffer = JSON.parse(tmp);\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tstash.bind('batch', function(action, woop) {\n\n\t\t\t\t\t\tif (action === 'write') {\n\t\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}, this, true);\n\n\t\t\t\t\tstash.batch('write', urls, assets);\n\n\t\t\t\t}, this, true);\n\n\t\t\t\t_STASH.batch('read', [\n\n\t\t\t\t\t_ASSET + '/harvester.js',\n\t\t\t\t\t_ASSET + '/icon.png',\n\t\t\t\t\t_ASSET + '/icon.svg',\n\t\t\t\t\t_ASSET + '/index.html',\n\t\t\t\t\t_ASSET + '/lychee.pkg',\n\n\t\t\t\t\t_ASSET + '/source/Main.js',\n\t\t\t\t\t_ASSET + '/source/net/Client.js',\n\t\t\t\t\t_ASSET + '/source/net/Server.js',\n\t\t\t\t\t_ASSET + '/source/net/client/Ping.js',\n\t\t\t\t\t_ASSET + '/source/net/remote/Ping.js',\n\t\t\t\t\t_ASSET + '/source/state/Welcome.js',\n\t\t\t\t\t_ASSET + '/source/state/Welcome.json'\n\n\t\t\t\t]);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t\tthis.bind('fork', function(oncomplete) {\n\n\t\t\tlet library = this.settings.library;\n\t\t\tlet project = this.settings.project;\n\t\t\tlet sandbox = this.sandbox;\n\t\t\tlet stash   = this.stash;\n\t\t\tlet urls    = [];\n\t\t\tlet assets  = [];\n\t\t\tlet pkg     = new Config(library + '/lychee.pkg');\n\t\t\tlet folder  = project.split('/')[1];\n\n\n\t\t\tconsole.log('breeder: FORK');\n\n\n\t\t\tpkg.onload = function() {\n\n\t\t\t\tif (this.buffer instanceof Object && this.buffer.build instanceof Object) {\n\n\t\t\t\t\tlet environments = this.buffer.build.environments || {};\n\n\t\t\t\t\tif (folder === 'projects') {\n\n\t\t\t\t\t\tObject.keys(environments).forEach(function(identifier) {\n\n\t\t\t\t\t\t\tif (/main$/g.test(identifier) === false) {\n\t\t\t\t\t\t\t\tdelete environments[identifier];\n\t\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\t\tlet tmp = environments[identifier];\n\t\t\t\t\t\t\t\tif (tmp.profile instanceof Object) {\n\n\t\t\t\t\t\t\t\t\tif (typeof tmp.profile.client === 'string') {\n\t\t\t\t\t\t\t\t\t\ttmp.profile.client = tmp.profile.client.replace(library, project);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\tif (typeof tmp.profile.server === 'string') {\n\t\t\t\t\t\t\t\t\t\ttmp.profile.server = tmp.profile.server.replace(library, project);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\ttmp.variant  = 'application';\n\t\t\t\t\t\t\t\ttmp.packages = [\n\t\t\t\t\t\t\t\t\t[ 'fork', './lychee.pkg' ],\n\t\t\t\t\t\t\t\t\t[ 'app',  library + '/lychee.pkg' ]\n\t\t\t\t\t\t\t\t];\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t_CONFIG.buffer.build.environments = environments;\n\n\n\t\t\t\t\t\tif (typeof environments['node/main'] !== 'undefined') {\n\t\t\t\t\t\t\turls.push(project + '/harvester.js');\n\t\t\t\t\t\t\tassets.push(_TEMPLATE.harvester);\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\turls.push(sandbox + '/lychee.pkg');\n\t\t\t\t\t\turls.push(sandbox + '/index.html');\n\t\t\t\t\t\turls.push(sandbox + '/source/Main.js');\n\n\t\t\t\t\t\tassets.push(_CONFIG);\n\t\t\t\t\t\tassets.push(_TEMPLATE.index);\n\t\t\t\t\t\tassets.push(_TEMPLATE.main);\n\n\t\t\t\t\t} else if (folder === 'libraries') {\n\n\t\t\t\t\t\tObject.keys(environments).forEach(function(identifier) {\n\n\t\t\t\t\t\t\tif (/dist$/g.test(identifier) === false) {\n\t\t\t\t\t\t\t\tdelete environments[identifier];\n\t\t\t\t\t\t\t} else {\n\n\t\t\t\t\t\t\t\tlet tmp = environments[identifier];\n\n\t\t\t\t\t\t\t\ttmp.variant  = 'library';\n\t\t\t\t\t\t\t\ttmp.packages = [\n\t\t\t\t\t\t\t\t\t[ 'fork', './lychee.pkg' ],\n\t\t\t\t\t\t\t\t\t[ 'app',  library + '/lychee.pkg' ]\n\t\t\t\t\t\t\t\t];\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\t\t\t\t\t\t_CONFIG.buffer.build.environments = environments;\n\n\n\t\t\t\t\t\turls.push(sandbox + '/lychee.pkg');\n\t\t\t\t\t\turls.push(sandbox + '/source/DIST.js');\n\t\t\t\t\t\turls.push(sandbox + '/source/Main.js');\n\n\t\t\t\t\t\tassets.push(_CONFIG);\n\t\t\t\t\t\tassets.push(_TEMPLATE.dist);\n\t\t\t\t\t\tassets.push(_TEMPLATE.main);\n\n\t\t\t\t\t}\n\n\n\t\t\t\t\tstash.bind('batch', function(action, map) {\n\n\t\t\t\t\t\tif (action === 'write') {\n\t\t\t\t\t\t\toncomplete(true);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t}, this, true);\n\n\t\t\t\t\tstash.batch('write', urls, assets);\n\n\t\t\t\t} else {\n\n\t\t\t\t\toncomplete(false);\n\n\t\t\t\t}\n\n\t\t\t};\n\n\t\t\tpkg.load();\n\n\t\t}, this);\n\n\t\tthis.bind('pull', function(oncomplete) {\n\n\t\t\tlet library = this.settings.library;\n\t\t\tlet stash   = this.stash;\n\n\n\t\t\tif (library !== null && stash !== null) {\n\n\t\t\t\tconsole.log('breeder: PULL ' + library);\n\n\n\t\t\t\tlet sandbox = this.sandbox;\n\n\n\t\t\t\t_STASH.bind('batch', function(type, assets) {\n\n\t\t\t\t\tlet main = assets.filter(function(asset) {\n\t\t\t\t\t\treturn /index\\.html|harvester\\.js/g.test(asset.url);\n\t\t\t\t\t});\n\t\t\t\t\tlet pkg  = assets.find(function(asset) {\n\t\t\t\t\t\treturn /lychee\\.pkg/g.test(asset.url);\n\t\t\t\t\t}) || null;\n\n\n\t\t\t\t\tif (main.length > 0 && pkg !== null) {\n\n\t\t\t\t\t\tlet platforms = [];\n\n\t\t\t\t\t\tObject.values(pkg.buffer.build.environments).forEach(function(environment) {\n\n\t\t\t\t\t\t\tlet tags = environment.tags || null;\n\t\t\t\t\t\t\tif (tags instanceof Object) {\n\n\t\t\t\t\t\t\t\tif (tags.platform instanceof Array) {\n\n\t\t\t\t\t\t\t\t\ttags.platform.forEach(function(val) {\n\n\t\t\t\t\t\t\t\t\t\tif (platforms.indexOf(val) === -1) {\n\t\t\t\t\t\t\t\t\t\t\tplatforms.push(val);\n\t\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\tif (platforms.length > 0) {\n\n\t\t\t\t\t\t\tlet injections = platforms.sort().map(function(platform) {\n\t\t\t\t\t\t\t\treturn library + '/build/' + platform + '/dist/index.js';\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\tlet tmp_stash  = new _Stash({\n\t\t\t\t\t\t\t\ttype: _Stash.TYPE.temporary\n\t\t\t\t\t\t\t});\n\n\n\t\t\t\t\t\t\ttmp_stash.bind('batch', function(type, assets) {\n\n\t\t\t\t\t\t\t\tfor (let a = 0, al = assets.length; a < al; a++) {\n\n\t\t\t\t\t\t\t\t\tlet asset = assets[a];\n\t\t\t\t\t\t\t\t\tif (asset.buffer !== null && asset.buffer !== '') {\n\t\t\t\t\t\t\t\t\t\tstash.write('.' + asset.url, asset);\n\t\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t});\n\n\t\t\t\t\t\t\ttmp_stash.batch('read', injections);\n\n\t\t\t\t\t\t\tthis.__injections = injections;\n\n\t\t\t\t\t\t}\n\n\n\t\t\t\t\t\tthis.__main = main;\n\n\t\t\t\t\t\tsetTimeout(function() {\n\n\t\t\t\t\t\t\tthis.trigger('pull-inject', [ function(result) {\n\t\t\t\t\t\t\t\toncomplete(result);\n\t\t\t\t\t\t\t} ]);\n\n\t\t\t\t\t\t}.bind(this), 500);\n\n\t\t\t\t\t} else {\n\n\t\t\t\t\t\toncomplete(false);\n\n\t\t\t\t\t}\n\n\t\t\t\t}, this, true);\n\n\n\t\t\t\t_STASH.batch('read', [\n\t\t\t\t\tsandbox + '/harvester.js',\n\t\t\t\t\tsandbox + '/index.html',\n\t\t\t\t\tsandbox + '/lychee.pkg'\n\t\t\t\t]);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(false);\n\n\t\t\t}\n\n\t\t});\n\n\n\t\tthis.bind('pull-inject', function(oncomplete) {\n\n\t\t\tlet injections = this.__injections;\n\t\t\tlet main       = this.__main;\n\t\t\tlet stash      = this.stash;\n\n\n\t\t\tif (injections.length > 0 && main.length > 0 && stash !== null) {\n\n\t\t\t\tfor (let m = 0, ml = main.length; m < ml; m++) {\n\n\t\t\t\t\tlet tmp = main[m];\n\t\t\t\t\tif (tmp.buffer !== null) {\n\n\t\t\t\t\t\tconsole.log('breeder: PULL-INJECT ' + tmp.url);\n\n\n\t\t\t\t\t\ttmp.buffer = _inject(tmp.buffer, injections);\n\n\t\t\t\t\t\tstash.write(tmp.url, tmp);\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\n\t\t\t\tsetTimeout(function() {\n\t\t\t\t\toncomplete(true);\n\t\t\t\t}, 500);\n\n\t\t\t} else {\n\n\t\t\t\toncomplete(true);\n\n\t\t\t}\n\n\t\t}, this);\n\n\t};\n\n\n\tComposite.prototype = {\n\n\t\t/*\n\t\t * ENTITY API\n\t\t */\n\n\t\tdeserialize: function(blob) {\n\n\t\t\tlet stash = lychee.deserialize(blob.stash);\n\t\t\tif (stash !== null) {\n\t\t\t\tthis.stash = stash;\n\t\t\t}\n\n\t\t},\n\n\t\tserialize: function() {\n\n\t\t\tlet data = _Flow.prototype.serialize.call(this);\n\t\t\tdata['constructor'] = 'breeder.Template';\n\n\n\t\t\tlet settings = data['arguments'][0] || {};\n\t\t\tlet blob     = data['blob'] || {};\n\n\n\t\t\tif (this.sandbox !== '') settings.sandbox = this.sandbox;\n\n\n\t\t\tif (this.stash !== null) blob.stash = lychee.serialize(this.stash);\n\n\n\t\t\tdata['arguments'][0] = settings;\n\t\t\tdata['blob']         = Object.keys(blob).length > 0 ? blob : null;\n\n\n\t\t\treturn data;\n\n\t\t},\n\n\n\n\t\t/*\n\t\t * CUSTOM API\n\t\t */\n\n\t\tsetSandbox: function(sandbox) {\n\n\t\t\tsandbox = typeof sandbox === 'string' ? sandbox : null;\n\n\n\t\t\tif (sandbox !== null) {\n\n\t\t\t\tthis.sandbox = sandbox;\n\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t},\n\n\t\tsetSettings: function(settings) {\n\n\t\t\tsettings = settings instanceof Object ? settings : null;\n\n\n\t\t\tif (settings !== null) {\n\n\t\t\t\tthis.settings = settings;\n\n\t\t\t\treturn true;\n\n\t\t\t}\n\n\n\t\t\treturn false;\n\n\t\t}\n\n\t};\n\n\n\treturn Composite;\n\n}"}}},"features":{"process":{"stdin":{"on":"function"}},"require":"function"}}});
 	if (environment !== null) {
 		environment.init();
 	}
