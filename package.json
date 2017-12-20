@@ -1,7 +1,7 @@
 {
 	"name":        "lycheejs",
 	"title":       "lychee.js",
-	"version":     "2017.3.0",
+	"version":     "2017.4.0",
 	"main":        "build/node/lychee.js",
 	"homepage":    "https://lychee.js.org",
 	"description": "Next-Gen Isomorphic Application Library",

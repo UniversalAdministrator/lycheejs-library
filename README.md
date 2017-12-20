@@ -1,5 +1,5 @@
 
-# lychee.js Library (2017-Q3)
+# lychee.js Library (2017-Q4)
 
 brought to you as libre software with joy and pride by [Artificial Engineering](http://artificial.engineering).
 
